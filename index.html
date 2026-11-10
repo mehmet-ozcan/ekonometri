@@ -411,6 +411,26 @@ kbd{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;border:
 .soru-giris input.dogru{border-color:var(--good);background:var(--good-soft)}
 .soru-giris input.yanlis{border-color:var(--bad);background:var(--bad-soft)}
 
+.katex .hl{color:var(--warm)}
+.katex .hl2{color:var(--accent)}
+
+/* Adım göstericisi: düğmeler son adımın içinde */
+.adim-dugme{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding-top:8px;margin-top:4px;border-top:1px dashed var(--line)}
+/* Hata terimi nedenleri */
+.neden-liste{display:flex;flex-direction:column;gap:8px}
+.neden-liste button{justify-content:flex-start;text-align:left;gap:10px}
+.neden-liste button .no{display:inline-flex;align-items:center;justify-content:center;width:1.7em;height:1.7em;border-radius:50%;background:var(--warm-soft);color:var(--warm);font-weight:800;flex:none}
+.neden-liste button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.neden-detay p{margin:0 0 .6em;font-size:clamp(.95rem,1.15vw,1.05rem);line-height:1.6}
+.neden-detay .ornek-kutu{background:var(--panel2);border:1px dashed var(--accent-line);border-radius:12px;padding:10px 14px;margin:6px 0 10px}
+.tarihce{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.tarihce li{display:grid;grid-template-columns:3.4em 1fr;gap:8px;font-size:.92rem;line-height:1.45}
+.tarihce li b:first-child{color:var(--accent);font-variant-numeric:tabular-nums}
+
+.tarihce.yatay{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 22px}
+.tarihce.yatay li{font-size:.84rem;line-height:1.36}
+@media (max-width:900px){.tarihce.yatay{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -502,7 +522,8 @@ kbd{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;border:
     for (var i = d.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = d[i]; d[i] = d[j]; d[j] = t; }
     return d;
   };
-  E.tr = function (x, k, grup) { return Number(x).toLocaleString('tr-TR', { minimumFractionDigits: k, maximumFractionDigits: k, useGrouping: !!grup }); };
+  /* Ondalık ayraç: nokta (binlik ayraç istenirse ince boşluk) */
+  E.tr = function (x, k, grup) { var s0 = Number(x).toLocaleString('en-US', { minimumFractionDigits: k, maximumFractionDigits: k, useGrouping: !!grup }); return grup ? s0.split(',').join('\u202f') : s0; };
 
   /* ---------- Tarayıcı deposu (çalışmazsa sessizce atlanır) ---------- */
   var depo = {
@@ -624,11 +645,14 @@ kbd{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;border:
     document.body.appendChild(kap);
   };
 
-  /* LaTeX -> HTML (KaTeX, çevrimdışı). Sayılarda ondalık için {,} kullanın. */
+  /* LaTeX -> HTML (KaTeX, çevrimdışı). Sayılarda ondalık ayraç noktadır. */
   E.m = function (latex, blok) {
-    try { return window.katex ? window.katex.renderToString(latex, { throwOnError: false, displayMode: !!blok, output: 'html', strict: 'ignore' }) : latex; } catch (e) { return latex; }
+    latex = String(latex).split('§').join(String.fromCharCode(92)); /* § işareti ters eğik çizgi yerine kullanılabilir */
+    try { return window.katex ? window.katex.renderToString(latex, { throwOnError: false, displayMode: !!blok, output: 'html', strict: 'ignore', trust: true }) : latex; } catch (e) { return latex; }
   };
-  E.sayi = function (x, k) { return E.tr(x, k).replace(',', '{,}').replace('-', '-'); };
+  /* Metin içinde $...$ arasındaki kısımları LaTeX olarak çevirir (başlık, şık, açıklama vb.) */
+  E.mt = function (t) { return String(t).split('$').map(function (p, i) { return i % 2 ? E.m(p) : p; }).join(''); };
+  E.sayi = function (x, k) { return E.tr(x, k); };
   E.gorsel = function (ad) { return (window.GORSEL || {})[ad] || ''; };
 
   /* ---------- Kapak sanatı: saçılım grafiği + regresyon doğrusu ---------- */
@@ -682,15 +706,16 @@ kbd{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;border:
             [].forEach.call(siklar.children, function (c, k) { c.disabled = true; if (secenekler[k].d) c.classList.add('dogru'); });
             if (!o.d) b.classList.add('yanlis');
             geriBildirim.hidden = false;
-            geriBildirim.innerHTML = (o.d ? '<b>Doğru.</b> ' : '<b>Olmadı.</b> ') + (s.aciklama || '');
+            geriBildirim.innerHTML = (o.d ? '<b>Doğru.</b> ' : '<b>Olmadı.</b> ') + E.mt(s.aciklama || '');
             ileriBtn2.hidden = false; ileriBtn2.focus();
           }
-        }, o.m);
+        }, null);
+        b.innerHTML = E.mt(o.m);
         siklar.appendChild(b);
       });
       kutu.appendChild(E.h('div', { class: 'kart' },
         E.h('div', { class: 'ust-satir' }, E.h('span', {}, 'Soru ' + (i + 1) + ' / ' + sorular.length), E.h('span', {}, 'Doğru: ' + puan)),
-        E.h('p', { class: 'soru', html: s.soru }), siklar, geriBildirim, E.h('p', { style: 'margin:14px 0 0' }, ileriBtn2)));
+        E.h('p', { class: 'soru', html: E.mt(s.soru) }), siklar, geriBildirim, E.h('p', { style: 'margin:14px 0 0' }, ileriBtn2)));
     }
     ciz();
   };
@@ -750,6 +775,229 @@ kbd{display:inline-block;min-width:1.6em;text-align:center;padding:0 6px;border:
     var k = konumOku() || [0, 0];
     ti = k[0]; si = k[1]; yon = 1;
     ciz();
+  };
+})();
+
+/* Regresyon sekmeleri için ortak yardımcılar: istatistik fonksiyonları, EKK hesabı, grafik/tablo iskeletleri,
+   adım adım gösterici. LaTeX dizgelerinde ters eğik çizgi yerine § yazılır (E.m çevirir). */
+(function () {
+  'use strict';
+  var E = window.E, h = E.h, s = E.s, tr = E.tr;
+  var Y = E.y = {};
+  Y.m = E.m;
+  Y.n = E.sayi;               // LaTeX içi ondalık sayı:  Y.n(1.5, 2) -> "1.50"
+  Y.t = function (x, k) { return tr(x, k); };
+
+  /* ---------- Olasılık dağılımları (t ve F) ---------- */
+  function lgamma(x) {
+    var c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5];
+    var y = x, tmp = x + 5.5; tmp -= (x + 0.5) * Math.log(tmp);
+    var ser = 1.000000000190015; for (var j = 0; j < 6; j++) ser += c[j] / ++y;
+    return -tmp + Math.log(2.5066282746310005 * ser / x);
+  }
+  function betacf(a, b, x) {
+    var qab = a + b, qap = a + 1, qam = a - 1, c = 1, d = 1 - qab * x / qap, FP = 1e-300;
+    if (Math.abs(d) < FP) d = FP; d = 1 / d; var hh = d;
+    for (var m = 1; m <= 300; m++) {
+      var m2 = 2 * m, aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FP) d = FP; c = 1 + aa / c; if (Math.abs(c) < FP) c = FP; d = 1 / d; hh *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d; if (Math.abs(d) < FP) d = FP; c = 1 + aa / c; if (Math.abs(c) < FP) c = FP; d = 1 / d;
+      var del = d * c; hh *= del; if (Math.abs(del - 1) < 3e-12) break;
+    }
+    return hh;
+  }
+  function ibeta(x, a, b) {
+    if (x <= 0) return 0; if (x >= 1) return 1;
+    var bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+    return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+  }
+  Y.tcdf = function (t, df) { var p = 0.5 * ibeta(df / (df + t * t), df / 2, 0.5); return t > 0 ? 1 - p : p; };
+  Y.tpdf = function (t, df) { return Math.exp(lgamma((df + 1) / 2) - lgamma(df / 2)) / Math.sqrt(df * Math.PI) * Math.pow(1 + t * t / df, -(df + 1) / 2); };
+  Y.tinv = function (p, df) { var lo = -200, hi = 200; for (var i = 0; i < 80; i++) { var mid = (lo + hi) / 2; if (Y.tcdf(mid, df) < p) lo = mid; else hi = mid; } return (lo + hi) / 2; };
+  Y.fcdf = function (f, d1, d2) { return f <= 0 ? 0 : ibeta(d1 * f / (d1 * f + d2), d1 / 2, d2 / 2); };
+  Y.fpdf = function (f, d1, d2) {
+    if (f <= 0) return 0;
+    return Math.exp(0.5 * (d1 * Math.log(d1 * f) + d2 * Math.log(d2) - (d1 + d2) * Math.log(d1 * f + d2)) - Math.log(f) - (lgamma(d1 / 2) + lgamma(d2 / 2) - lgamma((d1 + d2) / 2)));
+  };
+  Y.finv = function (p, d1, d2) { var lo = 0, hi = 1e4; for (var i = 0; i < 90; i++) { var mid = (lo + hi) / 2; if (Y.fcdf(mid, d1, d2) < p) lo = mid; else hi = mid; } return (lo + hi) / 2; };
+
+  /* ---------- Basit doğrusal regresyon (EKK) ---------- */
+  Y.ols = function (X, Yv) {
+    var n = X.length, i, sX = 0, sY = 0, sXY = 0, sXX = 0, sYY = 0;
+    for (i = 0; i < n; i++) { sX += X[i]; sY += Yv[i]; sXY += X[i] * Yv[i]; sXX += X[i] * X[i]; sYY += Yv[i] * Yv[i]; }
+    var mx = sX / n, my = sY / n, sxx = 0, syy = 0, sxy = 0;
+    for (i = 0; i < n; i++) { sxx += (X[i] - mx) * (X[i] - mx); syy += (Yv[i] - my) * (Yv[i] - my); sxy += (X[i] - mx) * (Yv[i] - my); }
+    var b = sxy / sxx, a = my - b * mx, fit = [], e = [], sse = 0, ess = 0, se1 = 0;
+    for (i = 0; i < n; i++) { var f = a + b * X[i]; fit.push(f); e.push(Yv[i] - f); sse += (Yv[i] - f) * (Yv[i] - f); ess += (f - my) * (f - my); se1 += Yv[i] - f; }
+    var df = n - 2, s2 = sse / df;
+    return {
+      n: n, df: df, sX: sX, sY: sY, sXY: sXY, sXX: sXX, sYY: sYY, mx: mx, my: my, sxx: sxx, syy: syy, sxy: sxy, b: b, a: a, fit: fit, e: e,
+      sse: sse, ess: ess, sst: syy, r2: ess / syy, r: sxy / Math.sqrt(sxx * syy), s2: s2, s: Math.sqrt(s2),
+      seb: Math.sqrt(s2 / sxx), sea: Math.sqrt(s2 * (1 / n + mx * mx / sxx)), sumE: se1,
+      ta: a / Math.sqrt(s2 * (1 / n + mx * mx / sxx)), tb: b / Math.sqrt(s2 / sxx), F: ess / (sse / df)
+    };
+  };
+
+  /* Örnek 1 (yeni, farazi): bir mobilya zincirinin 8 şubesi.
+     Y = aylık satış (bin TL), X = aylık reklam harcaması (bin TL). Sonuçlar tam sayı: α̂ = 8, β̂ = 2, SSE = 12. */
+  Y.etY = [22, 12, 23, 17, 23, 25, 16, 22];
+  Y.etX = [6, 3, 8, 4, 7, 9, 4, 7];
+  Y.et = Y.ols(Y.etX, Y.etY);
+
+  /* Sayıyı gereksiz sıfırlar olmadan yazar: Y.k → LaTeX içinde (ondalık ayraç nokta), Y.kt → düz metin */
+  Y.kt = function (x, maxd) {
+    var d = maxd == null ? 4 : maxd, v = Math.round(x * Math.pow(10, d)) / Math.pow(10, d);
+    if (Math.abs(v) < 1e-12) v = 0;
+    var s0 = v.toFixed(d);
+    if (s0.indexOf('.') >= 0) s0 = s0.replace(/0+$/, '').replace(/[.]$/, '');
+    return s0.replace('-', '−');
+  };
+  Y.k = function (x, maxd) { return Y.kt(x, maxd).replace('−', '-'); };
+
+  /* Dikey süslü parantez (sağa bakan uç): x konumunda y1 ile y2 arası */
+  Y.parantez = function (x, y1, y2, w) {
+    var ust = Math.min(y1, y2), alt = Math.max(y1, y2), ym = (ust + alt) / 2, q = Math.min(w, (alt - ust) / 4);
+    return 'M' + x + ' ' + ust + ' Q' + (x + w) + ' ' + ust + ' ' + (x + w) + ' ' + (ust + q) +
+      ' L' + (x + w) + ' ' + (ym - q) + ' Q' + (x + w) + ' ' + ym + ' ' + (x + 2 * w) + ' ' + ym +
+      ' Q' + (x + w) + ' ' + ym + ' ' + (x + w) + ' ' + (ym + q) + ' L' + (x + w) + ' ' + (alt - q) +
+      ' Q' + (x + w) + ' ' + alt + ' ' + x + ' ' + alt;
+  };
+
+  /* ---------- Arayüz yardımcıları ---------- */
+  Y.baslik = function (el, etiket, bas, alt) {
+    el.appendChild(h('div', {}, h('p', { class: 'etiket' }, etiket), h('h2', { class: 'bas', style: 'margin-top:4px', html: E.mt(bas) }), alt ? h('p', { class: 'altbas', style: 'margin-top:6px', html: alt }) : null));
+  };
+  Y.temizle = function (k) { while (k.firstChild) k.removeChild(k.firstChild); };
+  Y.kapak = function (el, o) {
+    el.appendChild(h('div', { class: 'kapak' },
+      h('div', {},
+        h('p', { class: 'etiket' }, o.etiket || 'Ekonometri'),
+        h('h1', { class: 'buyuk', style: 'font-size:clamp(2rem,5.2vw,4rem)' }, o.baslik),
+        h('p', { class: 'kim' }, 'Doç. Dr. Mehmet Özcan'),
+        h('p', { class: 'kurum' }, h('a', { href: 'http://www.ozcanmehmet.com', target: '_blank', rel: 'noopener' }, 'www.ozcanmehmet.com')),
+        h('div', { class: 'arac-satir' },
+          h('button', { class: 'btn birincil', type: 'button', onclick: E.ileri }, 'Başlayalım →'),
+          h('span', { class: 'sunum-ipucu', html: o.ipucu || '' }))),
+      h('div', { class: 'sanat' }, E.sanat(o.tohum || 41))));
+  };
+
+  /* Eksenli grafik iskeleti */
+  Y.grafik = function (o) {
+    var W = o.W || 480, H = o.H || 330, L = o.L || 50, R = 16, T = o.T || 26, B = o.B || 40;
+    var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'sema ' + (o.cls || ''), role: 'img', 'aria-label': o.etiket || 'Grafik' });
+    var sx = function (x) { return L + (x - o.x[0]) / (o.x[1] - o.x[0]) * (W - L - R); };
+    var sy = function (y) { return H - B - (y - o.y[0]) / (o.y[1] - o.y[0]) * (H - B - T); };
+    var g, fm = function (v) { return String(+v.toFixed(6)); };
+    for (g = o.y[0]; g <= o.y[1] + 1e-9; g += o.y[2]) {
+      svg.appendChild(s('line', { class: 'izgara', x1: L, x2: W - R, y1: sy(g), y2: sy(g) }));
+      svg.appendChild(s('text', { x: L - 8, y: sy(g) + 4, 'text-anchor': 'end', class: 'sonuk', 'font-size': 12 }, fm(g)));
+    }
+    for (g = o.x[0]; g <= o.x[1] + 1e-9; g += o.x[2]) {
+      svg.appendChild(s('text', { x: sx(g), y: H - B + 18, 'text-anchor': 'middle', class: 'sonuk', 'font-size': 12 }, fm(g)));
+    }
+    svg.appendChild(s('line', { class: 'eks', x1: L, y1: T - 8, x2: L, y2: H - B }));
+    svg.appendChild(s('line', { class: 'eks', x1: L, y1: H - B, x2: W - R, y2: H - B }));
+    svg.appendChild(s('text', { x: W - R, y: H - 6, 'text-anchor': 'end', class: 'metin-svg', 'font-size': 13, 'font-weight': 700 }, o.xe || 'X'));
+    svg.appendChild(s('text', { x: 6, y: 13, class: 'metin-svg', 'font-size': 13, 'font-weight': 700 }, o.ye || 'Y'));
+    var kat = s('g'); svg.appendChild(kat);
+    return { svg: svg, kat: kat, sx: sx, sy: sy, W: W, H: H, L: L, R: R, T: T, B: B };
+  };
+
+  /* Sütunları adım adım açılan veri tablosu.
+     kol: [{b: başlık html, lv: görünme adımı, f: function(i) -> sayı, t: toplam (isteğe bağlı), d: ondalık, ort: ortalama metni}] */
+  Y.tablo = function (kol, n, o) {
+    o = o || {};
+    var tablo = h('table', { class: 'veri-tablo kompakt' }), adim = 99, vurgulu = -1;
+    function sinif(c) { return (c.lv > adim ? 'gizli ' : '') + (c.lv === adim ? 'yeni ' : ''); }
+    function ciz() {
+      tablo.textContent = '';
+      tablo.appendChild(h('thead', {}, h('tr', {}, kol.map(function (c) { return h('th', { class: sinif(c), html: c.b }); }))));
+      var tb = h('tbody', {});
+      for (var i = 0; i < n; i++) {
+        (function (i) {
+          var satir = h('tr', { class: i === vurgulu ? 'vurgulu' : '' }, kol.map(function (c) { var v = c.f(i); return h('td', { class: sinif(c) + (typeof v === 'number' && v < 0 ? 'eksi' : '') }, typeof v === 'number' ? tr(v, c.d == null ? 0 : c.d) : String(v)); }));
+          if (o.hover) { satir.addEventListener('mouseenter', function () { o.hover(i, true); }); satir.addEventListener('mouseleave', function () { o.hover(i, false); }); }
+          tb.appendChild(satir);
+        })(i);
+      }
+      tablo.appendChild(tb);
+      var tf = h('tfoot', {});
+      if (kol.some(function (c) { return c.t != null; })) tf.appendChild(h('tr', { class: 'sf' }, kol.map(function (c, j) { return h('td', { class: sinif(c), html: c.t == null ? (j === 0 && o.topAd ? o.topAd : '') : (typeof c.t === 'number' ? tr(c.t, c.td == null ? (c.d == null ? 0 : c.d) : c.td) : c.t) }); })));
+      if (kol.some(function (c) { return c.ort != null; })) tf.appendChild(h('tr', { class: 'sf' }, kol.map(function (c) { return h('td', { class: (c.ortLv != null ? (c.ortLv > adim ? 'gizli' : '') : sinif(c)), html: c.ort || '' }); })));
+      tablo.appendChild(tf);
+    }
+    ciz();
+    return { el: tablo, ciz: function (a) { adim = a; ciz(); }, vurgu: function (i) { vurgulu = i; ciz(); } };
+  };
+
+  /* Adım adım türetme göstericisi.
+     A: [{cap, f:[latex satırları], d:[html satırları], tag, uyari}]
+     "Önceki / Sonraki adım" düğmeleri her zaman en son açılan adımın içindedir; böylece sayfayı yukarı kaydırmak gerekmez. */
+  Y.adimli = function (el, A, o) {
+    o = o || {};
+    var k = 0, ilk = true, liste = h('div', { style: 'display:flex;flex-direction:column;gap:10px' });
+    var sayac = h('span', { class: 'rozet sicak' });
+    var basaUst = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { git(0); } }, 'Başa dön');
+    var hepsiUst = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { git(A.length - 1); } }, 'Tüm adımlar');
+    function git(i) { k = Math.max(0, Math.min(A.length - 1, i)); ciz(); }
+    function dugmeler() {
+      var r = h('div', { class: 'adim-dugme' });
+      r.appendChild(h('button', { class: 'btn kucuk', type: 'button', disabled: k === 0, onclick: function () { git(k - 1); } }, '← Önceki adım'));
+      if (k < A.length - 1) r.appendChild(h('button', { class: 'btn birincil kucuk', type: 'button', onclick: function () { git(k + 1); } }, 'Sonraki adım →'));
+      else r.appendChild(h('button', { class: 'btn kucuk', type: 'button', onclick: function () { git(0); } }, '↺ Başa dön'));
+      r.appendChild(h('span', { class: 'sunum-ipucu' }, (k + 1) + ' / ' + A.length));
+      return r;
+    }
+    /* Son adımı (ve içindeki düğmeleri) görünür alana getirir: en yakın kaydırılabilir kabı bulur */
+    function gorunurYap(blok) {
+      var kap = blok.parentElement;
+      while (kap && !(kap.scrollHeight > kap.clientHeight + 2 && /(auto|scroll)/.test(getComputedStyle(kap).overflowY))) kap = kap.parentElement;
+      if (!kap) kap = document.scrollingElement || document.documentElement;
+      var kr = kap === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : kap.getBoundingClientRect(), br = blok.getBoundingClientRect();
+      var hedef = kap.scrollTop;
+      if (br.bottom > kr.bottom - 12) hedef += br.bottom - kr.bottom + 16;        /* aşağıda kaldıysa: düğmeler görünsün */
+      else if (br.top < kr.top + 8) hedef += br.top - kr.top - 12;                /* yukarıda kaldıysa (geri / başa dön) */
+      if (Math.abs(hedef - kap.scrollTop) < 2) return;
+      try { kap.scrollTo({ top: hedef, behavior: 'smooth' }); } catch (e) { kap.scrollTop = hedef; }
+      setTimeout(function () { if (Math.abs(kap.scrollTop - hedef) > 4 && kap.scrollTop + kap.clientHeight < kap.scrollHeight - 2) kap.scrollTop = hedef; }, 600);
+    }
+    function ciz() {
+      liste.textContent = '';
+      var son = null;
+      for (var i = 0; i <= k; i++) {
+        var a = A[i];
+        var blok = h('div', { class: 'adim-blok' + (i === k ? ' son' : '') },
+          h('div', { class: 'cap', html: E.mt(a.cap) }),
+          h('div', { class: 'fm', html: (a.f || []).map(function (l) { return '<div class="fs">' + E.m(l) + '</div>'; }).join('') }),
+          h('div', { class: 'deg', html: (a.d || []).map(function (l) { return '<div class="fs">' + l + '</div>'; }).join('') + (a.tag ? '<div style="color:var(--muted);font-size:.86em;margin-top:2px">' + E.mt(a.tag) + '</div>' : '') }),
+          a.uyari ? h('div', { class: 'not', style: 'grid-column:1/-1;font-size:.92rem;padding:7px 12px', html: E.mt(a.uyari) }) : null,
+          i === k ? dugmeler() : null);
+        liste.appendChild(blok); son = blok;
+      }
+      sayac.textContent = (k + 1) + ' / ' + A.length;
+      if (!ilk && son) gorunurYap(son);
+      ilk = false;
+    }
+    el.style.justifyContent = 'flex-start';
+    el.appendChild(h('div', { class: 'arac-satir' }, sayac, basaUst, hepsiUst, o.ust ? h('span', { class: 'fm', style: 'font-size:1.02rem', html: E.m(o.ust) }) : null));
+    el.appendChild(liste);
+    ciz();
+  };
+
+  /* Küçük seçenek anahtarı: etiketler dizisi, seçim değişince cb(i) */
+  Y.anahtar = function (etiketler, ilk, cb) {
+    var kap = h('div', { class: 'anahtar', role: 'group' });
+    var sec = function (i) { [].forEach.call(kap.children, function (b, k) { b.setAttribute('aria-pressed', k === i); }); cb(i); };
+    etiketler.forEach(function (t, i) { kap.appendChild(h('button', { type: 'button', 'aria-pressed': i === ilk, onclick: function () { sec(i); } }, t)); });
+    kap.sec = sec;
+    return kap;
+  };
+  Y.kaydir = function (ad, min, max, adim, ilk, cb, fmt) {
+    var g = h('input', { type: 'range', min: min, max: max, step: adim, value: ilk, 'aria-label': ad }), d = h('b', {}, fmt ? fmt(ilk) : String(ilk));
+    g.addEventListener('input', function () { d.textContent = fmt ? fmt(+g.value) : g.value; cb(+g.value); });
+    var kap = h('label', { class: 'kaydir' }, ad, g, d); kap.girdi = g; kap.deger = d;
+    return kap;
   };
 })();
 
@@ -918,7 +1166,7 @@ window.GORSEL={"kitap-dikmen": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABA
       h('div', { class: 'hesap' },
         h('label', {}, 'Vize + Ödev puanı', vo),
         h('label', {}, 'Final puanı', fn),
-        h('div', { class: 'sonuc' }, h('i', {}, 'Ağırlıklı puan  (0,4 × VÖ + 0,6 × F)'), sonuc)),
+        h('div', { class: 'sonuc' }, h('i', {}, 'Ağırlıklı puan  (0.4 × VÖ + 0.6 × F)'), sonuc)),
       h('p', { style: 'margin:10px 0 0' }, katki)));
     el.appendChild(h('p', { class: 'sunum-ipucu' }, 'Hesaplayıcı yalnızca yukarıdaki ağırlıkları uygular; başarı notu koşulları için üniversitenin yönetmeliği esas alınır.'));
   }
@@ -1022,7 +1270,7 @@ window.GORSEL={"kitap-dikmen": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABA
         var x = 0.4 + i * (9.2 / (n - 1)), y = 2 + 1.7 * x + (mod === 'sto' ? E.normal(r) * gurultu : 0);
         svg.appendChild(s('circle', { class: 'dag-nokta', cx: sx(x), cy: sy(Math.max(0.3, Math.min(19.7, y))), r: 6 }));
       }
-      svg.appendChild(s('text', { x: sx(0.3), y: sy(2 + 1.7 * 10) + 16, class: 'sicak', 'font-size': 14, 'font-weight': 700 }, mod === 'det' ? 'Y = 2 + 1,7·X  (kesin)' : 'Y = 2 + 1,7·X + rassal sapma'));
+      svg.appendChild(s('text', { x: sx(0.3), y: sy(2 + 1.7 * 10) + 16, class: 'sicak', 'font-size': 14, 'font-weight': 700 }, mod === 'det' ? 'Y = 2 + 1.7·X  (kesin)' : 'Y = 2 + 1.7·X + rassal sapma'));
       kaydSatir.style.visibility = mod === 'sto' ? 'visible' : 'hidden'; yeniBtn.style.visibility = mod === 'sto' ? 'visible' : 'hidden';
       metin.innerHTML = mod === 'det'
         ? '<b>Deterministik:</b> X bilindiğinde Y tam olarak bellidir; tüm noktalar doğrunun üzerindedir.'
@@ -1578,11 +1826,11 @@ window.GORSEL={"kitap-dikmen": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABA
     for (g = o.y[0]; g <= o.y[1] + 1e-9; g += o.y[2]) {
       g = +g.toFixed(6);
       svg.appendChild(s('line', { class: 'izgara', x1: L, x2: W - R, y1: sy(g), y2: sy(g) }));
-      svg.appendChild(s('text', { x: L - 8, y: sy(g) + 4, 'text-anchor': 'end', class: 'sonuk', 'font-size': 12 }, String(g).replace('.', ',')));
+      svg.appendChild(s('text', { x: L - 8, y: sy(g) + 4, 'text-anchor': 'end', class: 'sonuk', 'font-size': 12 }, String(g)));
     }
     for (g = o.x[0]; g <= o.x[1] + 1e-9; g += o.x[2]) {
       g = +g.toFixed(6);
-      svg.appendChild(s('text', { x: sx(g), y: H - B + 18, 'text-anchor': 'middle', class: 'sonuk', 'font-size': 12 }, String(g).replace('.', ',')));
+      svg.appendChild(s('text', { x: sx(g), y: H - B + 18, 'text-anchor': 'middle', class: 'sonuk', 'font-size': 12 }, String(g)));
     }
     svg.appendChild(s('line', { class: 'eks', x1: L, y1: T - 8, x2: L, y2: H - B }));
     svg.appendChild(s('line', { class: 'eks', x1: L, y1: H - B, x2: W - R, y2: H - B }));
@@ -1778,28 +2026,7 @@ window.GORSEL={"kitap-dikmen": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABA
       { cap: '4 · Yerine yaz', f: ['r_{XY} = ' + fr(TOP + XY, 'n \\, ' + kk(fr(TOP + X2, 'n') + ' \\cdot ' + fr(TOP + Y2, 'n')))], d: [] },
       { cap: '5 · n sadeleşir', f: ['r_{XY} = ' + fr(TOP + XY, kk(TOP + X2) + ' \\, ' + kk(TOP + Y2))], d: [m('= ' + fr(s1, pay) + ' = ' + r2)], tag: m('n\\sqrt{1/n^{2}} = 1') }
     ];
-        var k = 0, liste = h('div', { style: 'display:flex;flex-direction:column;gap:10px' });
-    var geriB = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { k = Math.max(0, k - 1); ciz(); } }, '← Önceki adım');
-    var ileriB = h('button', { class: 'btn birincil kucuk', type: 'button', onclick: function () { k = Math.min(A.length - 1, k + 1); ciz(); } }, 'Sonraki adım →');
-    var basaB = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { k = 0; ciz(); } }, 'Başa dön');
-    function ciz() {
-      liste.textContent = '';
-      for (var i = 0; i <= k; i++) {
-        var a = A[i];
-        liste.appendChild(h('div', { class: 'adim-blok' + (i === k ? ' son' : '') },
-          h('div', { class: 'cap' }, a.cap),
-          h('div', { class: 'fm', html: a.f.map(function (l) { return '<div class="fs">' + m(l) + '</div>'; }).join('') }),
-          h('div', { class: 'deg', html: a.d.map(function (l) { return '<div class="fs">' + l + '</div>'; }).join('') + (a.tag ? '<div style="color:var(--muted);font-size:.86em;margin-top:2px">' + a.tag + '</div>' : '') }),
-          a.uyari ? h('div', { class: 'not', style: 'grid-column:1/-1;font-size:.92rem;padding:7px 12px', html: a.uyari }) : null));
-      }
-      geriB.disabled = k === 0; ileriB.disabled = k === A.length - 1;
-      sahne2.scrollTop = 1e6;
-    }
-    var sahne2 = document.getElementById('sahne');
-    el.appendChild(h('div', { class: 'arac-satir' }, geriB, ileriB, basaB,
-      h('span', { class: 'fm', style: 'font-size:1.05rem', html: m('x_{i} = X_{i} - \\bar{X}, \\quad y_{i} = Y_{i} - \\bar{Y}') })));
-    el.appendChild(liste);
-    ciz();
+    E.y.adimli(el, A, { ust: 'x_{i} = X_{i} - ' + String.fromCharCode(92) + 'bar{X}, ' + String.fromCharCode(92) + 'quad y_{i} = Y_{i} - ' + String.fromCharCode(92) + 'bar{Y}' });
   }
 
   /* ---------- 7 · Hesap tablosu (Slayt-5) ---------- */
@@ -1965,7 +2192,7 @@ window.GORSEL={"kitap-dikmen": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABA
       { soru: '<i>Σxy / n</i> neye denir?', secenekler: ['Ortak varyans (S_XY)', 'Standart sapma', 'Korelasyon katsayısı', 'Ortalama'], dogru: 0, aciklama: 'n\'ye bölmek ilk sakıncayı giderir; sonuç X ile Y\'nin ortak varyansıdır.' },
       { soru: 'Ortak varyans neye bölünerek ölçü biriminden arındırılır?', secenekler: ['S_X · S_Y (standart sapmaların çarpımı)', 'n', 'X̄ · Ȳ', '∑x'], dogru: 0, aciklama: 'r = S_XY / (S_X · S_Y).' },
       { soru: 'Arz miktarı ton yerine kg, fiyat lira yerine kuruşla ölçülürse <i>r</i> ne olur?', secenekler: ['Değişmez', '1000 kat artar', '100 kat artar', 'Negatif olur'], dogru: 0, aciklama: 'r birimsizdir: ölçü biriminden bağımsızdır.' },
-      { soru: 'Hangisi <i>r</i> için mümkün bir değer <b>değildir</b>?', secenekler: ['1,4', '−1', '0', '0,97'], dogru: 0, aciklama: 'r, −1 ile +1 arasında değer alır.' }
+      { soru: 'Hangisi <i>r</i> için mümkün bir değer <b>değildir</b>?', secenekler: ['1.4', '−1', '0', '0.97'], dogru: 0, aciklama: 'r, −1 ile +1 arasında değer alır.' }
     ]);
   }
 
@@ -1982,6 +2209,711 @@ window.GORSEL={"kitap-dikmen": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABA
       { ad: 'r hangi değerleri alır?', bolum: B2, goster: degerler },
       { ad: 'Örnek soru: faiz ve konut kredisi', bolum: B3, goster: hikaye },
       { ad: 'Özet ve mini sınav', goster: sinav }
+    ]
+  });
+})();
+
+/* ===== 03a-regresyon-a.js ===== */
+/* Sekme 4 (1/2) — Basit Doğrusal Regresyon (A): kavramlar, EKK türetimi, Örnek 1 çözümü
+   Kaynak: Ders-2 Regresyon Teorisi.docx ("VİZE" satırına kadar). LaTeX'te ters eğik çizgi yerine § yazılır. */
+(function () {
+  var h = E.h, s = E.s, tr = E.tr, Y = E.y, M = E.m, N = Y.n, B = Y.baslik;
+  var A = Y.A = {};
+  var S1 = '1 · Model ve temel kavramlar', S2 = '2 · En küçük kareler (EKK)', S3 = '3 · Örnek 1: reklam ve satış',
+      S4 = '4 · Karşılaştırma ve özellikler', S5 = '5 · Matris yöntemi', S6 = '6 · Uyum İyiliği';
+  A.S = [S1, S2, S3, S4, S5, S6];
+  var ET = Y.et, ETX = Y.etX, ETY = Y.etY;
+
+  /* 1 · Kapak */
+  A.kapak = function (el) { Y.kapak(el, { baslik: 'Basit Doğrusal Regresyon (A)', tohum: 41, ipucu: 'Model · EKK · Örnek 1 · Uyum iyiliği' }); };
+
+  /* 2 · Matematiksel model → regresyon modeli */
+  A.model = function (el) {
+    B(el, S1, 'Matematiksel model ve regresyon modeli');
+    var rg = E.rng(12), n = 18, X = [], Z = [], i;
+    for (i = 0; i < n; i++) { X.push(0.4 + 9.2 * i / (n - 1)); Z.push(E.normal(rg)); }
+    var mod = 0, a = 2, b = 1, g = 1.6;
+    var G = Y.grafik({ W: 480, H: 232, x: [0, 10, 2], y: [-5, 25, 5], xe: 'X', ye: 'Y', cls: 'graf-sinir', etiket: 'Doğrusal model ve gözlemler' });
+    var formul = h('div', { class: 'fm' }), okuma = h('div', { class: 'okuma' });
+    var anah = Y.anahtar(['Kesin ilişki', 'Olasılık eklenince (hata terimi)'], 0, function (k) { mod = k; ciz(); });
+    var ka = Y.kaydir('α', 0, 8, 0.5, a, function (v) { a = v; ciz(); }, function (v) { return tr(v, 1); });
+    var kb = Y.kaydir('β', -1, 2, 0.1, b, function (v) { b = v; ciz(); }, function (v) { return tr(v, 1); });
+    var kg = Y.kaydir('Hata', 0, 4, 0.1, g, function (v) { g = v; ciz(); }, function (v) { return tr(v, 1); });
+    function ciz() {
+      Y.temizle(G.kat);
+      G.kat.appendChild(s('line', { x1: G.sx(0), y1: G.sy(a), x2: G.sx(10), y2: G.sy(a + 10 * b), stroke: 'var(--warm)', 'stroke-width': 3, 'stroke-linecap': 'round' }));
+      X.forEach(function (x, k) { var y = a + b * x + (mod ? g * Z[k] : 0); G.kat.appendChild(s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: G.sy(Math.max(-4.7, Math.min(24.7, y))), r: 5.5 })); });
+      G.kat.appendChild(s('circle', { cx: G.sx(0), cy: G.sy(a), r: 6.5, fill: 'var(--panel)', stroke: 'var(--warm)', 'stroke-width': 3 }));
+      formul.innerHTML = M(mod ? 'Y = §alpha + §beta X + §varepsilon' : 'Y = §alpha + §beta X') + '<span class="sunum-ipucu" style="font-size:.5em;margin-left:10px">' + (mod ? 'Eşitlik (2)' : 'Eşitlik (1)') + '</span>';
+      okuma.textContent = '';
+      okuma.appendChild(h('div', { class: 'kutu sicak' }, h('i', {}, 'X = 0 ise'), h('b', { html: M('Y = §alpha = ' + N(a, 1)) })));
+      okuma.appendChild(h('div', { class: 'kutu vurgulu' }, h('i', {}, 'X bir birim artınca'), h('b', { html: M('Y ' + (b >= 0 ? '+' : '-') + ' ' + N(Math.abs(b), 1)) })));
+      kg.style.visibility = mod ? 'visible' : 'hidden';
+    }
+    var tarih = h('div', { class: 'not mavi', style: 'font-size:.95rem;padding:10px 16px;max-width:none' }, h('b', {}, 'Regresyonun kısa hikâyesi'),
+      h('ul', { class: 'tarihce yatay' },
+        h('li', { html: '<b>1801</b><span>Piazzi, Mars ile Jüpiter arasında <b>Ceres</b>\'i keşfeder; birkaç hafta sonra cisim Güneş\'in parıltısında kaybolur.</span>' }),
+        h('li', { html: '<b>1801</b><span>24 yaşındaki <b>Gauss</b>, az sayıdaki gözlemden yörüngeyi hesaplar; Ceres yılın son günü tam öngördüğü yerde bulunur.</span>' }),
+        h('li', { html: '<b>1805</b><span><b>Legendre</b>, hata karelerinin toplamını en küçük yapan <b>en küçük kareler</b> yöntemini ilk kez yayımlar.</span>' }),
+        h('li', { html: '<b>1809</b><span>Gauss, <i>Theoria Motus</i> (Gök Cisimlerinin Hareket Kuramı) eserinde yöntemi normal dağılıma bağlar; 1795\'ten beri kullandığını yazar.</span>' }),
+        h('li', { html: '<b>1886</b><span><b>Galton</b>, uzun boylu ana babaların çocuklarının boyunun ortalamaya “geri döndüğünü” gösterir: <i>regression</i> (geri dönüş) adı buradan gelir.</span>' }),
+        h('li', { html: '<b>1899</b><span><b>Yule</b>, İngiltere\'de yoksulluğun nedenlerini incelerken regresyonu iktisadi verilere uygular; yol ekonometriye açılır.</span>' })));
+    el.appendChild(h('div', { class: 'iki dar-sag', 'data-kaydirma-yok': '' },
+      h('div', { class: 'kart', style: 'padding:8px 12px' }, G.svg),
+      h('div', { style: 'display:flex;flex-direction:column;gap:12px' }, anah, formul, h('div', { class: 'arac-satir' }, ka, kb), kg, okuma)));
+    el.appendChild(tarih);
+    ciz();
+  };
+  /* 3 · Basit regresyon modeli: terimler */
+  A.basitModel = function (el) {
+    B(el, S1, 'Basit regresyon modeli', 'Terimlere dokunun.');
+    var T = [
+      { k: 'Y', ad: 'Y', tan: 'Bağımlı değişken' },
+      { k: 'X', ad: 'X', tan: 'Bağımsız değişken (regressor)' },
+      { k: 'e', ad: 'ε', tan: 'Hata terimi: gözlem noktası ile doğru arasındaki dikey uzaklık' },
+      { k: 'a', ad: 'α', tan: 'Sabit parametresi (katsayısı): X = 0 iken doğrunun Y eksenini kestiği yer' },
+      { k: 'b', ad: 'β', tan: 'Eğim parametresi (katsayısı): β = ΔY / ΔX' }
+    ];
+    var sec = 'Y';
+    var rg = E.rng(3), px = [], py = [], i;
+    for (i = 0; i < 9; i++) { px.push(1 + i); py.push(2 + 0.8 * (1 + i) + 1.3 * E.normal(rg)); }
+    var a0 = 2, b0 = 0.8, enb = 0;
+    px.forEach(function (x, k) { if (Math.abs(py[k] - a0 - b0 * x) > Math.abs(py[enb] - a0 - b0 * px[enb])) enb = k; });
+    var G = Y.grafik({ W: 440, H: 300, x: [0, 10, 2], y: [0, 14, 2], xe: 'X', ye: 'Y', cls: 'graf-genis', etiket: 'Terimlerin grafikteki yeri' });
+    var formul = h('div', { class: 'fm', style: 'font-size:clamp(1.6rem,3.4vw,2.6rem)' }), tanim = h('div', { class: 'not mavi' });
+    var kutular = h('div', { style: 'display:flex;flex-wrap:wrap;gap:10px' });
+    function hl(t, on) { return on ? '§htmlClass{hl}{' + t + '}' : t; }
+    function yaz(x, y, t, o) { var e = s('text', { x: x, y: y, 'font-size': (o && o.fs) || 14, 'font-weight': 700, fill: (o && o.renk) || 'var(--warm)', 'text-anchor': (o && o.hiza) || 'start', style: 'paint-order:stroke;stroke:var(--panel);stroke-width:4px' }, t); G.kat.appendChild(e); return e; }
+    function ciz() {
+      formul.innerHTML = M(hl('Y', sec === 'Y') + ' = ' + hl('§alpha', sec === 'a') + ' + ' + hl('§beta', sec === 'b') + ' ' + hl('X', sec === 'X') + ' + ' + hl('§varepsilon', sec === 'e'), true);
+      tanim.innerHTML = '<b>' + T.filter(function (t) { return t.k === sec; })[0].tan + '</b>';
+      [].forEach.call(kutular.children, function (b, k) { b.setAttribute('aria-pressed', T[k].k === sec); });
+      Y.temizle(G.kat);
+      var vx = sec === 'X' ? 'var(--warm)' : 'var(--ink2)', vy = sec === 'Y' ? 'var(--warm)' : 'var(--ink2)';
+      G.kat.appendChild(s('line', { x1: G.L, y1: G.H - G.B, x2: G.W - G.R, y2: G.H - G.B, stroke: vx, 'stroke-width': sec === 'X' ? 5 : 1 }));
+      G.kat.appendChild(s('line', { x1: G.L, y1: G.T - 8, x2: G.L, y2: G.H - G.B, stroke: vy, 'stroke-width': sec === 'Y' ? 5 : 1 }));
+      if (sec === 'b') {
+        var x0 = 3, x1 = 8, y0 = a0 + b0 * x0, y1 = a0 + b0 * x1;
+        G.kat.appendChild(s('path', { d: 'M' + G.sx(x0) + ' ' + G.sy(y0) + ' L' + G.sx(x1) + ' ' + G.sy(y0) + ' L' + G.sx(x1) + ' ' + G.sy(y1) + ' Z', fill: 'var(--warm-soft)', stroke: 'var(--warm)', 'stroke-width': 3, 'stroke-linejoin': 'round' }));
+        yaz(G.sx((x0 + x1) / 2), G.sy(y0) + 20, 'ΔX', { hiza: 'middle', fs: 16 });
+        yaz(G.sx(x1) + 10, G.sy((y0 + y1) / 2) + 5, 'ΔY', { fs: 16 });
+        yaz(G.sx(x0) + 10, G.sy(y1) + 4, 'β = ΔY / ΔX', { fs: 16 });
+      }
+      G.kat.appendChild(s('line', { x1: G.sx(0), y1: G.sy(a0), x2: G.sx(10), y2: G.sy(a0 + 10 * b0), stroke: 'var(--accent)', 'stroke-width': 2.5 }));
+      px.forEach(function (x, k) { G.kat.appendChild(s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: G.sy(py[k]), r: 5 })); });
+      if (sec === 'a') { G.kat.appendChild(s('circle', { cx: G.sx(0), cy: G.sy(a0), r: 9, fill: 'var(--warm)' })); yaz(G.sx(0) + 14, G.sy(a0) - 10, 'α'); }
+      if (sec === 'e') {
+        var xe = px[enb], ye = py[enb], yd = a0 + b0 * xe, bx = G.sx(xe) + 8;
+        G.kat.appendChild(s('line', { x1: G.sx(xe), x2: G.sx(xe), y1: G.sy(ye), y2: G.sy(yd), stroke: 'var(--warm)', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }));
+        G.kat.appendChild(s('path', { d: Y.parantez(bx, G.sy(ye), G.sy(yd), 10), fill: 'none', stroke: 'var(--warm)', 'stroke-width': 3, 'stroke-linecap': 'round' }));
+        yaz(bx + 24, (G.sy(ye) + G.sy(yd)) / 2 + 7, 'εᵢ', { fs: 22 });
+        G.kat.appendChild(s('circle', { cx: G.sx(xe), cy: G.sy(ye), r: 8, fill: 'var(--warm)' }));
+        G.kat.appendChild(s('circle', { cx: G.sx(xe), cy: G.sy(yd), r: 5, fill: 'var(--panel)', stroke: 'var(--accent)', 'stroke-width': 2.5 }));
+        yaz(G.sx(xe) - 10, G.sy(ye) + (ye > yd ? -12 : 22), 'gözlem (Xᵢ, Yᵢ)', { hiza: 'end', fs: 13 });
+        G.kat.appendChild(s('line', { x1: G.sx(xe) + 4, y1: G.sy(yd) + 7, x2: G.sx(xe) + 14, y2: G.sy(yd) + (ye > yd ? 30 : -30), stroke: 'var(--accent)', 'stroke-width': 1.5 }));
+        yaz(G.sx(xe) + 10, G.sy(yd) + (ye > yd ? 46 : -36), 'doğru üzerindeki nokta', { hiza: 'start', fs: 13, renk: 'var(--accent)' });
+      }
+    }
+    T.forEach(function (t) { kutular.appendChild(h('button', { class: 'btn', type: 'button', 'aria-pressed': 'false', onclick: function () { sec = t.k; ciz(); } }, h('span', { class: 'mat', style: 'font-size:1.2em' }, t.ad), ' ', t.tan.split(':')[0])); });
+    el.appendChild(h('div', { class: 'iki dar-sol', 'data-kaydirma-yok': '' },
+      h('div', { style: 'display:flex;flex-direction:column;gap:14px' }, formul, kutular, tanim),
+      h('div', { class: 'kart' }, G.svg)));
+    ciz();
+  };
+  /* 4 · Anakütle verisi ve anakütle regresyon doğrusu */
+  var GEL = [10, 20, 30], POP = [[2, 4, 8, 10], [6, 8, 10, 18], [10, 12, 19, 25]];
+  var POPX = [], POPY = [];
+  GEL.forEach(function (g, i) { POP[i].forEach(function (v) { POPX.push(g); POPY.push(v); }); });
+  var PRF = Y.ols(POPX, POPY);   // anakütle regresyon doğrusu: 0.5 + 0.525 X
+  A.anakutle = function (el) {
+    B(el, S1, 'Anakütle verisi: gelir ve tüketim');
+    var sec = -1, ortGoster = true, dogruGoster = false;
+    var G = Y.grafik({ W: 460, H: 320, x: [0, 40, 10], y: [0, 28, 4], xe: 'Gelir X (TL)', ye: 'Tüketim Y', cls: 'graf-genis', etiket: 'Anakütle saçılımı ve regresyon doğrusu' });
+    var ortMu = GEL.map(function (g, i) { return POP[i].reduce(function (p, c) { return p + c; }, 0) / 4; });
+    var tablo = h('table', { class: 'veri-tablo' });
+    var bilgi = h('div', { class: 'okuma' });
+    function tabloCiz() {
+      tablo.textContent = '';
+      tablo.appendChild(h('thead', {}, h('tr', {}, h('th', { style: 'font-style:normal' }, 'Gelir (X)'), GEL.map(function (g, i) { return h('th', { style: 'cursor:pointer;font-style:normal', class: sec === i ? 'yeni' : '', onclick: function () { sec = sec === i ? -1 : i; ciz(); } }, g + ' TL'); }))));
+      var tb = h('tbody', {});
+      for (var k = 0; k < 4; k++) tb.appendChild(h('tr', {}, h('td', { style: 'text-align:left' }, 'Tüketim Aile-' + (k + 1)), GEL.map(function (g, i) { return h('td', { class: sec === i ? 'yeni' : '' }, String(POP[i][k])); })));
+      tb.appendChild(h('tr', { class: 'sf' }, h('td', { style: 'text-align:left', html: M('E(Y|X)') }), ortMu.map(function (m, i) { return h('td', { class: sec === i ? 'yeni' : '' }, tr(m, m % 1 ? 1 : 0)); })));
+      tb.appendChild(h('tr', { class: 'sf' }, h('td', { style: 'text-align:left', html: M('E(Y)') }), h('td', { colspan: 3 }, '11')));
+      tablo.appendChild(tb);
+    }
+    function ciz() {
+      tabloCiz(); Y.temizle(G.kat);
+      if (dogruGoster) G.kat.appendChild(s('line', { x1: G.sx(4), y1: G.sy(PRF.a + PRF.b * 4), x2: G.sx(36), y2: G.sy(PRF.a + PRF.b * 36), stroke: 'var(--bad)', 'stroke-width': 3, 'stroke-linecap': 'round' }));
+      GEL.forEach(function (g, i) {
+        POP[i].forEach(function (v) {
+          if (sec === i && dogruGoster) G.kat.appendChild(s('line', { x1: G.sx(g), x2: G.sx(g), y1: G.sy(v), y2: G.sy(PRF.a + PRF.b * g), stroke: 'var(--warm)', 'stroke-width': 2.5 }));
+          G.kat.appendChild(s('circle', { class: 'dag-nokta', cx: G.sx(g), cy: G.sy(v), r: sec === i ? 7 : 5.5, style: sec === i ? 'fill:var(--warm)' : '' }));
+        });
+        if (ortGoster) G.kat.appendChild(s('circle', { cx: G.sx(g), cy: G.sy(ortMu[i]), r: 6.5, fill: 'var(--bad)', stroke: 'var(--panel)', 'stroke-width': 2 }));
+      });
+      bilgi.textContent = '';
+      if (dogruGoster) bilgi.appendChild(h('div', { class: 'kutu sicak' }, h('i', {}, 'Anakütle regresyon doğrusu'), h('b', { html: M('E(Y|X) = ' + N(PRF.a, 1) + ' + ' + N(PRF.b, 3) + 'X') })));
+      if (sec >= 0 && dogruGoster) bilgi.appendChild(h('div', { class: 'kutu' }, h('i', {}, 'X = ' + GEL[sec] + ' için hatalar'), h('b', { style: 'font-size:1rem', html: POP[sec].map(function (v, k) { return M('§varepsilon_{' + GEL[sec] + ',' + (k + 1) + '} = ' + N(v - (PRF.a + PRF.b * GEL[sec]), 2)); }).join(' &nbsp; ') })));
+    }
+    var t1 = h('button', { class: 'btn kucuk', type: 'button', 'aria-pressed': 'true', onclick: function () { ortGoster = !ortGoster; t1.setAttribute('aria-pressed', ortGoster); ciz(); } }, 'Koşullu ortalamalar');
+    var t2 = h('button', { class: 'btn kucuk', type: 'button', 'aria-pressed': 'false', onclick: function () { dogruGoster = !dogruGoster; t2.setAttribute('aria-pressed', dogruGoster); t2.className = 'btn kucuk' + (dogruGoster ? ' birincil' : ''); ciz(); } }, 'Anakütle regresyon doğrusu');
+    el.appendChild(h('div', { class: 'iki dar-sol', 'data-kaydirma-yok': '' },
+      h('div', { style: 'display:flex;flex-direction:column;gap:12px' }, h('div', { class: 'kart', style: 'padding:8px' }, tablo), h('div', { class: 'arac-satir' }, t1, t2), bilgi,
+        h('p', { class: 'sunum-ipucu', style: 'margin:0' }, 'Bir gelir düzeyinin başlığına dokunarak o sütunu seçin.')),
+      h('div', { class: 'kart' }, G.svg)));
+    ciz();
+  };
+
+  /* 5 · Örneklem ve örneklem regresyon doğrusu */
+  A.orneklem = function (el) {
+    B(el, S1, 'Gerçekte elimizde yalnızca örneklem var');
+    var G = Y.grafik({ W: 460, H: 320, x: [0, 40, 10], y: [0, 28, 4], xe: 'Gelir X (TL)', ye: 'Tüketim Y', cls: 'graf-genis', etiket: 'Örneklem regresyon doğrusu ve anakütle doğrusu' });
+    var secim = [3, 0, 1];      // notlardaki örneklem: 10 TL → Aile-4, 20 TL → Aile-1, 30 TL → Aile-2
+    var gecmis = [], oku = h('div', { class: 'okuma' }), tablo = h('table', { class: 'veri-tablo' });
+    function ornek() { return secim.map(function (k, i) { return POP[i][k]; }); }
+    function ciz() {
+      Y.temizle(G.kat);
+      GEL.forEach(function (g, i) { POP[i].forEach(function (v) { G.kat.appendChild(s('circle', { cx: G.sx(g), cy: G.sy(v), r: 4.5, fill: 'var(--muted)', opacity: .45 })); }); });
+      gecmis.forEach(function (o) { G.kat.appendChild(s('line', { x1: G.sx(4), y1: G.sy(o.a + o.b * 4), x2: G.sx(36), y2: G.sy(o.a + o.b * 36), stroke: 'var(--accent)', 'stroke-width': 1.2, opacity: .3 })); });
+      G.kat.appendChild(s('line', { x1: G.sx(4), y1: G.sy(PRF.a + PRF.b * 4), x2: G.sx(36), y2: G.sy(PRF.a + PRF.b * 36), stroke: 'var(--bad)', 'stroke-width': 3 }));
+      var y = ornek(), o = Y.ols(GEL, y);
+      G.kat.appendChild(s('line', { x1: G.sx(4), y1: G.sy(o.a + o.b * 4), x2: G.sx(36), y2: G.sy(o.a + o.b * 36), stroke: 'var(--accent)', 'stroke-width': 3, 'stroke-dasharray': '8 5' }));
+      GEL.forEach(function (g, i) { G.kat.appendChild(s('circle', { cx: G.sx(g), cy: G.sy(y[i]), r: 8, fill: 'var(--accent)', stroke: 'var(--panel)', 'stroke-width': 2 })); });
+      oku.textContent = '';
+      oku.appendChild(h('div', { class: 'kutu sicak' }, h('i', {}, 'Anakütle (gerçek)'), h('b', { style: 'font-size:1.05rem', html: M('§alpha = ' + N(PRF.a, 2) + ',\\; §beta = ' + N(PRF.b, 3)) })));
+      oku.appendChild(h('div', { class: 'kutu vurgulu' }, h('i', {}, 'Örneklemden tahmin'), h('b', { style: 'font-size:1.05rem', html: M('§hat{§alpha} = ' + N(o.a, 2) + ',\\; §hat{§beta} = ' + N(o.b, 3)) })));
+      tablo.textContent = '';
+      tablo.appendChild(h('thead', {}, h('tr', {}, h('th', { style: 'font-style:normal' }, 'Gelir (X)'), GEL.map(function (g) { return h('th', { style: 'font-style:normal' }, g + ' TL'); }))));
+      tablo.appendChild(h('tbody', {}, h('tr', {}, h('td', { style: 'text-align:left' }, 'Örneklemdeki tüketim'), y.map(function (v) { return h('td', {}, String(v)); })),
+        h('tr', { class: 'sf' }, h('td', { style: 'text-align:left' }, 'Örneklem ortalaması'), h('td', { colspan: 3 }, tr(y.reduce(function (p, c) { return p + c; }, 0) / 3, 2)))));
+    }
+    var yeni = h('button', { class: 'btn birincil kucuk', type: 'button', onclick: function () { secim = [0, 1, 2].map(function () { return Math.floor(Math.random() * 4); }); ciz(); } }, 'Yeni örneklem çek');
+    var otuz = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { gecmis = []; for (var q = 0; q < 25; q++) gecmis.push(Y.ols(GEL, [0, 1, 2].map(function (i) { return POP[i][Math.floor(Math.random() * 4)]; }))); ciz(); } }, '25 örneklem çiz');
+    var not = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { secim = [3, 0, 1]; gecmis = []; ciz(); } }, 'Notlardaki örneklem');
+    el.appendChild(h('div', { class: 'iki dar-sol', 'data-kaydirma-yok': '' },
+      h('div', { style: 'display:flex;flex-direction:column;gap:12px' },
+        h('p', { class: 'metin', style: 'font-size:1.02rem', html: 'Her gelir düzeyinden <b>tek bir aile</b> gözlemleyebildik. Kırmızı: gerçek ilişki (bilinmez). Mavi kesikli: örneklemden <b>tahmin</b> edilen doğru.' }),
+        h('div', { class: 'kart', style: 'padding:8px' }, tablo), h('div', { class: 'arac-satir' }, yeni, otuz, not), oku),
+      h('div', { class: 'kart' }, G.svg)));
+    ciz();
+  };
+
+  /* 6 · ARF ve ÖRF; değişimin ayrıştırılması */
+  A.arfOrf = function (el) {
+    B(el, S1, 'Anakütle (ARF) ve örneklem (ÖRF) regresyon fonksiyonu');
+    var sec = 0;
+    var kart = function (ad, l1, l2, tip) { return h('div', { class: 'kart' }, h('span', { class: 'rozet ' + tip }, ad), h('div', { class: 'fm', style: 'margin-top:8px', html: M(l1, false) + '<br>' + M(l2, false) })); };
+    var kutu = h('div', { class: 'fm', style: 'font-size:clamp(1.4rem,3vw,2.2rem)' }), anah = Y.anahtar(['Düzenli ve rassal değişim', 'Açıklanan ve açıklanamayan'], 0, function (k) { sec = k; ciz(); });
+    var yazi = h('div', { class: 'kartlar kol2' });
+    function hl(t, on) { return on ? '§htmlClass{hl}{' + t + '}' : t; }
+    function ciz() {
+      kutu.innerHTML = M('Y_i = ' + hl('§alpha + §beta X_i', true) + ' + ' + '§htmlClass{hl2}{§varepsilon_i}', true);
+      yazi.textContent = '';
+      yazi.appendChild(h('div', { class: 'kart' }, h('span', { class: 'rozet' }, sec ? 'Açıklanan değişim' : 'Düzenli değişim'), h('div', { class: 'fm', style: 'margin-top:6px', html: M('§alpha + §beta X_i') }), h('p', { class: 'sunum-ipucu', style: 'margin:4px 0 0' }, 'X ile birlikte sistemli değişen kısım')));
+      yazi.appendChild(h('div', { class: 'kart' }, h('span', { class: 'rozet sicak' }, sec ? 'Açıklanamayan değişim' : 'Rassal değişim'), h('div', { class: 'fm', style: 'margin-top:6px', html: M('§varepsilon_i') }), h('p', { class: 'sunum-ipucu', style: 'margin:4px 0 0' }, 'Olasılıksal, açıklanamayan kısım')));
+    }
+    el.appendChild(h('div', { class: 'kartlar kol2' },
+      kart('ARF · anakütle', 'Y_i = §alpha + §beta X_i + §varepsilon_i', 'E(Y|X_i) = §alpha + §beta X_i', ''),
+      kart('ÖRF · örneklem', 'Y_i = §hat{§alpha} + §hat{§beta}X_i + §hat{§varepsilon}_i', '§hat{Y}_i = §hat{§alpha} + §hat{§beta}X_i', 'sicak')));
+    el.appendChild(h('div', { class: 'kart' }, h('div', { class: 'arac-satir' }, anah), kutu, yazi));
+    ciz();
+  };
+
+  /* 7 · Hata terimi neden ortaya çıkar? (ayrıntılı) */
+  A.hataNedenleri = function (el) {
+    B(el, S1, 'Hata terimi neden ortaya çıkar?', 'Bir nedeni seçin; açıklamayı ve küçük deneyi inceleyin.');
+    var sec = 0, mod = 0, sigma = 0;
+    var N5 = [
+      {
+        ad: 'Modele alınmayan bağımsız değişkenler',
+        p: ['Bağımlı değişkeni etkileyen değişkenlerin hepsini modele almak mümkün değildir. Bazılarını kuram söylemez, bazılarının verisi yoktur, bazıları (zevkler, beklentiler, psikolojik durum) ölçülemez; tek tek etkisi küçük olanlar da <b>sadelik ilkesi</b> gereği dışarıda bırakılır.',
+            'Dışarıda kalan tüm bu etkilerin toplamı hata terimine yansır. Dışlanan değişken modeldeki X ile de ilişkiliyse sorun büyür: tahmin edilen katsayılar sapmalı olur.'],
+        ornek: 'Şube satışlarını yalnızca reklam belirlemez: şubenin büyüklüğü, konumu, çevredeki rakip sayısı da satışı etkiler. Deneyde büyük şubelerin noktaları doğrunun hep üstünde, küçüklerinkiler hep altında kalır.',
+        demo: 'gizli', anah: ['Yalnızca reklam', 'Şube büyüklüğünü göster']
+      },
+      {
+        ad: 'İnsan davranışlarının belirsizliği',
+        p: ['İnsanlar aynı koşullar altında farklı kararlar verebilir. Alışkanlıklar, ani istekler, bilgi eksikliği ya da o günkü ruh hâli kararları etkiler.',
+            'İktisat kuramı bireylerin rasyonel davrandığını varsayar; bu “ortalama” davranıştan her sapma, regresyon doğrusunun etrafındaki rassal dağılım olarak ortaya çıkar. Bu rassallık, ne kadar değişken eklenirse eklensin tamamen ortadan kalkmaz.'],
+        ornek: 'Anakütle örneğimizde (gelir–tüketim) aynı 30 TL geliri olan dört aile 10, 12, 19 ve 25 TL tüketmektedir. Gelir aynı, davranış farklı.',
+        demo: 'davranis'
+      },
+      {
+        ad: 'Matematiksel kalıbın yanlış seçilmesi',
+        p: ['Değişkenler arasındaki gerçek ilişki doğrusal olmayabilir: azalan verim, doygunluk, eşik etkileri gibi durumlarda ilişki eğriseldir. Böyle bir ilişki doğrusal modelle tahmin edilirse hataların bir kısmı rassal değil, <b>sistemli</b> olur.',
+            'Ayrıca birden fazla denklemle (örneğin arz ve talep birlikte) belirlenen bir iktisadi süreci tek denklemle göstermek de hataya yol açar.'],
+        ornek: 'Reklamın satışa etkisi bir noktadan sonra azalır (doygunluk). Eğrisel ilişkiye doğru uydurulduğunda artıklar ortada artı, uçlarda eksi olur: bu kalıp, fonksiyon biçiminin yanlış seçildiğinin işaretidir.',
+        demo: 'kalip', anah: ['Doğru ile tahmin', 'Artıkları göster']
+      },
+      {
+        ad: 'Toplulaştırma yanlışlıkları',
+        p: ['Farklı davranan iktisadi birimlerin verileri toplanarak tek bir değişken hâline getirildiğinde, birimler arasındaki farklar kaybolur. Toplam ilişki, hiçbir grubun gerçek davranışını tam yansıtmaz.',
+            'Toplulaştırma zaman boyutunda da olur: aylık verilerin yıllık toplamlara çevrilmesi kısa dönem dalgalanmaları gizler.'],
+        ornek: 'Düşük gelirli haneler gelirlerinin büyük kısmını tüketir (yüksek marjinal tüketim eğilimi), yüksek gelirliler daha azını. İki grubun verisi birleştirildiğinde tek doğru, iki grubu da iyi temsil etmez.',
+        demo: 'toplu', anah: ['Birleşik veri', 'Grupları ayır']
+      },
+      {
+        ad: 'Ölçme yanlışlıkları',
+        p: ['Veriler derlenirken, kaydedilirken ve işlenirken hatalar oluşur: anket yanıtlarındaki yanlışlıklar, kayıt dışı ekonomi, yuvarlamalar, gerçek kavramın yerine bir <b>vekil değişken</b> kullanılması (örneğin “kalıcı gelir” yerine cari gelir).',
+            'Y\'deki ölçme hatası doğrudan hata terimine eklenir. X\'teki ölçme hatası daha ciddidir: tahmin edilen eğimi sıfıra doğru çeker (zayıflatma sapması).'],
+        ornek: 'Kaydırıcıyla reklam harcamasının ölçümüne hata ekleyin: gerçek eğim 2 olduğu hâlde, tahmin edilen eğim hata büyüdükçe küçülür.',
+        demo: 'olcme'
+      }
+    ];
+    var liste = h('div', { class: 'neden-liste' }), detay = h('div', { class: 'kart neden-detay' });
+    N5.forEach(function (n, i) { liste.appendChild(h('button', { class: 'btn', type: 'button', 'aria-pressed': 'false', onclick: function () { sec = i; mod = 0; sigma = 0; ciz(); } }, h('span', { class: 'no' }, String(i + 1)), n.ad)); });
+    function grafik(o) { return Y.grafik({ W: 440, H: 250, x: o.x, y: o.y, xe: o.xe, ye: o.ye, cls: 'graf-sinir', etiket: 'Örnek grafik' }); }
+    function dogru(G, a, b, x0, x1, renk, kesik) { G.kat.appendChild(s('line', { x1: G.sx(x0), y1: G.sy(a + b * x0), x2: G.sx(x1), y2: G.sy(a + b * x1), stroke: renk || 'var(--warm)', 'stroke-width': 3, 'stroke-dasharray': kesik ? '7 5' : '' })); }
+    function nokta(G, x, y, renk, r) { G.kat.appendChild(s('circle', { cx: G.sx(x), cy: G.sy(y), r: r || 5, fill: renk || 'var(--accent)', opacity: .85 })); }
+    function lejant(G, ogeler) { ogeler.forEach(function (o, i) { G.kat.appendChild(s('circle', { cx: G.L + 18, cy: G.T + 2 + i * 18, r: 5, fill: o[0] })); G.kat.appendChild(s('text', { x: G.L + 28, y: G.T + 7 + i * 18, 'font-size': 12, class: 'metin-svg' }, o[1])); }); }
+    var DEMO = {
+      gizli: function () {
+        var rg = E.rng(5), X = [], Yv = [], Z = [], i;
+        for (i = 0; i < 14; i++) { var x = 1 + 9 * rg(), z = i % 2; X.push(x); Z.push(z); Yv.push(5 + 1.6 * x + 6 * z + E.normal(rg) * 0.8); }
+        var o = Y.ols(X, Yv), G = grafik({ x: [0, 10, 2], y: [0, 30, 5], xe: 'Reklam X', ye: 'Satış Y' });
+        dogru(G, o.a, o.b, 0, 10);
+        X.forEach(function (x, k) { nokta(G, x, Yv[k], mod ? (Z[k] ? 'var(--good)' : 'var(--bad)') : 'var(--accent)'); });
+        if (mod) lejant(G, [['var(--good)', 'büyük şube'], ['var(--bad)', 'küçük şube']]);
+        return G.svg;
+      },
+      davranis: function () {
+        var G = grafik({ x: [0, 40, 10], y: [0, 28, 4], xe: 'Gelir X (TL)', ye: 'Tüketim Y' });
+        dogru(G, PRF.a, PRF.b, 4, 36, 'var(--warm)');
+        GEL.forEach(function (g, i) {
+          var ys = POP[i], lo = Math.min.apply(null, ys), hi = Math.max.apply(null, ys);
+          G.kat.appendChild(s('path', { d: Y.parantez(G.sx(g) + 9, G.sy(hi), G.sy(lo), 6), fill: 'none', stroke: 'var(--ink2)', 'stroke-width': 2 }));
+          ys.forEach(function (v) { nokta(G, g, v); });
+        });
+        G.kat.appendChild(s('text', { x: G.sx(30) + 30, y: G.sy(18), 'font-size': 12, 'font-weight': 700, class: 'metin-svg' }, 'aynı gelir,'));
+        G.kat.appendChild(s('text', { x: G.sx(30) + 30, y: G.sy(18) + 15, 'font-size': 12, 'font-weight': 700, class: 'metin-svg' }, 'farklı tüketim'));
+        return G.svg;
+      },
+      kalip: function () {
+        var X = [], Yv = [], i;
+        for (i = 0; i <= 12; i++) { var x = 0.5 + i * 0.75; X.push(x); Yv.push(4 + 9 * Math.log(1 + x)); }
+        var o = Y.ols(X, Yv), G = grafik({ x: [0, 10, 2], y: [0, 30, 5], xe: 'Reklam X', ye: 'Satış Y' });
+        dogru(G, o.a, o.b, 0, 10);
+        X.forEach(function (x, k) {
+          if (mod) G.kat.appendChild(s('line', { x1: G.sx(x), x2: G.sx(x), y1: G.sy(Yv[k]), y2: G.sy(o.fit[k]), stroke: o.e[k] > 0 ? 'var(--good)' : 'var(--bad)', 'stroke-width': 3 }));
+          nokta(G, x, Yv[k]);
+        });
+        if (mod) lejant(G, [['var(--good)', 'artık > 0'], ['var(--bad)', 'artık < 0']]);
+        return G.svg;
+      },
+      toplu: function () {
+        var rg = E.rng(9), XA = [], YA = [], XB = [], YB = [], i;
+        for (i = 0; i < 8; i++) { var x = 2 + 4 * rg(); XA.push(x); YA.push(1 + 0.9 * x + E.normal(rg) * 0.3); }
+        for (i = 0; i < 8; i++) { var x2 = 8 + 6 * rg(); XB.push(x2); YB.push(5 + 0.45 * x2 + E.normal(rg) * 0.3); }
+        var o = Y.ols(XA.concat(XB), YA.concat(YB)), oa = Y.ols(XA, YA), ob = Y.ols(XB, YB);
+        var G = grafik({ x: [0, 16, 4], y: [0, 14, 2], xe: 'Gelir X', ye: 'Tüketim Y' });
+        dogru(G, o.a, o.b, 0, 16, 'var(--warm)');
+        if (mod) { dogru(G, oa.a, oa.b, 1, 7, 'var(--bad)', true); dogru(G, ob.a, ob.b, 7, 15, 'var(--good)', true); }
+        XA.forEach(function (x, k) { nokta(G, x, YA[k], mod ? 'var(--bad)' : 'var(--accent)'); });
+        XB.forEach(function (x, k) { nokta(G, x, YB[k], mod ? 'var(--good)' : 'var(--accent)'); });
+        if (mod) lejant(G, [['var(--bad)', 'düşük gelirli haneler'], ['var(--good)', 'yüksek gelirli haneler']]);
+        return G.svg;
+      },
+      olcme: function () {
+        var rg = E.rng(13), X = [], Xo = [], Yv = [], i;
+        for (i = 0; i < 20; i++) { var x = 1 + 8 * i / 19; X.push(x); Yv.push(8 + 2 * x + E.normal(rg) * 1.2); Xo.push(x + sigma * E.normal(rg)); }
+        var o = Y.ols(Xo, Yv), G = grafik({ x: [-4, 14, 2], y: [0, 30, 5], xe: 'Ölçülen reklam X', ye: 'Satış Y' });
+        dogru(G, 8, 2, -4, 11, 'var(--ink2)', true);
+        dogru(G, o.a, o.b, -4, 14);
+        Xo.forEach(function (x, k) { nokta(G, Math.max(-3.8, Math.min(13.8, x)), Yv[k]); });
+        lejant(G, [['var(--ink2)', 'gerçek ilişki (eğim 2)'], ['var(--warm)', 'tahmin: eğim ' + tr(o.b, 2)]]);
+        return G.svg;
+      }
+    };
+    function ciz() {
+      [].forEach.call(liste.children, function (b, i) { b.setAttribute('aria-pressed', i === sec); });
+      var n = N5[sec]; detay.textContent = '';
+      detay.appendChild(h('span', { class: 'rozet sicak' }, (sec + 1) + '. neden'));
+      detay.appendChild(h('h3', { style: 'margin:6px 0 8px;font-size:1.25rem' }, n.ad));
+      n.p.forEach(function (t) { detay.appendChild(h('p', { html: t })); });
+      detay.appendChild(h('div', { class: 'ornek-kutu' }, h('p', { class: 'etiket', style: 'margin:0 0 4px' }, 'Örnek'), h('p', { style: 'margin:0', html: n.ornek })));
+      if (n.anah) detay.appendChild(h('div', { class: 'arac-satir', style: 'margin-bottom:6px' }, Y.anahtar(n.anah, mod, function (k) { mod = k; ciz(); })));
+      if (n.demo === 'olcme') detay.appendChild(Y.kaydir('X\'teki ölçme hatası', 0, 3, 0.1, sigma, function (v) { sigma = v; ciz(); }, function (v) { return tr(v, 1); }));
+      detay.appendChild(DEMO[n.demo]());
+    }
+    el.appendChild(h('div', { class: 'iki dar-sol', 'data-kaydirma-yok': '' },
+      h('div', { style: 'display:flex;flex-direction:column;gap:12px' }, liste,
+        h('div', { class: 'not mavi', style: 'font-size:.9rem', html: '<b>Ayrıca:</b> kuramın belirsizliği, verinin bulunamaması, zayıf vekil değişkenler ve sadelik ilkesi de hata terimini besler.' }),
+        h('p', { class: 'sunum-ipucu', style: 'margin:0' }, 'Kaynaklar: Koutsoyiannis, A. (1977). Theory of Econometrics; Gujarati, D. N. ve Porter, D. C. (2009). Basic Econometrics.')),
+      detay));
+    ciz();
+  };
+  /* 8 · EKK'nin amacı: neyin karesi, neyin en küçüğü? */
+  A.ekkAmaci = function (el) {
+    B(el, S2, 'EKK: neyin karesi? neyin en küçüğü?', 'Doğruyu oynatın: hataların <b>toplamı</b> neden işe yaramaz?');
+    var X = ETX, Yv = ETY, a = 14, b = 0.8, ortada = false;
+    var G = Y.grafik({ W: 520, H: 340, x: [0, 10, 2], y: [0, 30, 5], xe: 'Reklam X (bin TL)', ye: 'Satış Y (bin TL)', cls: 'graf-genis', etiket: 'Doğru ve hata kareleri' });
+    var oku = h('div', { class: 'okuma' });
+    var ka = Y.kaydir('a', 0, 20, 0.5, a, function (v) { a = v; ortada = false; tgl(); ciz(); }, function (v) { return tr(v, 1); });
+    var kb = Y.kaydir('b', -1, 4, 0.05, b, function (v) { b = v; ciz(); }, function (v) { return tr(v, 2); });
+    var bOrt = h('button', { class: 'btn kucuk', type: 'button', 'aria-pressed': 'false', onclick: function () { ortada = !ortada; tgl(); ciz(); } }, 'Doğruyu ortalama noktasından geçir');
+    var bEkk = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { b = ET.b; a = ET.a; ortada = false; ka.girdi.value = a; kb.girdi.value = b; tgl(); ciz(); } }, 'EKK doğrusunu göster');
+    function tgl() { bOrt.setAttribute('aria-pressed', ortada); bOrt.className = 'btn kucuk' + (ortada ? ' birincil' : ''); }
+    function ciz() {
+      if (ortada) { a = ET.my - b * ET.mx; ka.girdi.value = Math.max(0, Math.min(20, a)); }
+      ka.deger.textContent = tr(a, 1); kb.deger.textContent = tr(b, 2);
+      Y.temizle(G.kat);
+      G.kat.appendChild(s('line', { x1: G.sx(0), y1: G.sy(a), x2: G.sx(10), y2: G.sy(a + 10 * b), stroke: 'var(--warm)', 'stroke-width': 3 }));
+      var se = 0, se2 = 0;
+      X.forEach(function (x, i) {
+        var f = a + b * x, e = Yv[i] - f; se += e; se2 += e * e;
+        var py = G.sy(Yv[i]), pf = G.sy(f), yuk = Math.abs(py - pf);
+        G.kat.appendChild(s('rect', { x: G.sx(x), y: Math.min(py, pf), width: yuk, height: yuk, fill: 'var(--bad)', opacity: .18 }));
+        G.kat.appendChild(s('line', { x1: G.sx(x), x2: G.sx(x), y1: py, y2: pf, stroke: 'var(--bad)', 'stroke-width': 2 }));
+        G.kat.appendChild(s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: py, r: 5 }));
+      });
+      G.kat.appendChild(s('circle', { cx: G.sx(ET.mx), cy: G.sy(ET.my), r: 6, fill: 'var(--panel)', stroke: 'var(--ink)', 'stroke-width': 2.5 }));
+      oku.textContent = '';
+      oku.appendChild(h('div', { class: 'kutu' + (Math.abs(se) < 1e-6 ? ' vurgulu' : '') }, h('i', {}, 'Hataların toplamı'), h('b', { html: M('§sum §varepsilon_i = ' + Y.k(se, 2)) })));
+      oku.appendChild(h('div', { class: 'kutu sicak' }, h('i', {}, 'Hata kareleri toplamı'), h('b', { html: M('§sum §varepsilon_i^2 = ' + Y.k(se2, 2)) })));
+      oku.appendChild(h('div', { class: 'kutu' }, h('i', {}, 'En küçük (EKK)'), h('b', { html: M(Y.k(ET.sse, 2)) })));
+    }
+    el.appendChild(h('div', { class: 'iki dar-sag', 'data-kaydirma-yok': '' }, h('div', { class: 'kart' }, G.svg),
+      h('div', { style: 'display:flex;flex-direction:column;gap:12px' },
+        h('div', { class: 'fm', html: M('§hat{Y}_i = a + bX_i') }), ka, kb, h('div', { class: 'arac-satir' }, bOrt, bEkk), oku,
+        h('div', { class: 'not', html: '<b>Hatalar artı ve eksi çıkar:</b> ortalama noktasından geçen her doğruda ' + M('§sum §varepsilon = 0') + ' olur. Bu yüzden karelerini alırız.' }))));
+    ciz();
+  };
+  /* 9 · Normal denklemler */
+  A.normalDenk = function (el) {
+    B(el, S2, 'EKK: birinci türevler ve normal denklemler');
+    Y.adimli(el, [
+      { cap: '1 · Amaç fonksiyonu', f: ['§varepsilon_i = Y_i - §hat{§alpha} - §hat{§beta}X_i', '§sum §varepsilon_i^2 = §sum §left(Y_i - §hat{§alpha} - §hat{§beta}X_i§right)^2'], d: [], tag: 'Hata Kareler Toplamı (SSE) en küçük olmalı: iki bilinmeyen, iki türev' },
+      { cap: '2 · $§hat{§alpha}$ için birinci türev', f: ['§dfrac{§partial §sum §varepsilon_i^2}{§partial §hat{§alpha}} = -2§sum §left(Y_i - §hat{§alpha} - §hat{§beta}X_i§right) = 0'], d: [] },
+      { cap: '3 · Düzenle: 1. normal denklem', f: ['§sum Y_i - §sum §hat{§alpha} - §hat{§beta}§sum X_i = 0', '§sum Y_i = n§hat{§alpha} + §hat{§beta}§sum X_i'], d: [], tag: '1. Normal denklem' },
+      { cap: '4 · Her iki tarafı n\'e böl', f: ['§bar{Y} = §hat{§alpha} + §hat{§beta}§bar{X}'], d: [], tag: 'Regresyon doğrusu (X̄, Ȳ) noktasından geçer' },
+      { cap: '5 · $§hat{§beta}$ için birinci türev', f: ['§dfrac{§partial §sum §varepsilon_i^2}{§partial §hat{§beta}} = -2§sum X_i§left(Y_i - §hat{§alpha} - §hat{§beta}X_i§right) = 0'], d: [] },
+      { cap: '6 · Düzenle: 2. normal denklem', f: ['§sum Y_iX_i - §hat{§alpha}§sum X_i - §hat{§beta}§sum X_i^2 = 0', '§sum Y_iX_i = §hat{§alpha}§sum X_i + §hat{§beta}§sum X_i^2'], d: [], tag: '2. Normal denklem' }
+    ]);
+  };
+
+  /* 10 · $§hat{§beta}$ çözümü */
+  A.betaCozum = function (el) {
+    B(el, S2, 'EKK: $§hat{§beta}$ nasıl bulunur?');
+    Y.adimli(el, [
+      { cap: '1 · 1. normal denklemden $§hat{§alpha}$\'yı yalnız bırak', f: ['§hat{§alpha} = §dfrac{1}{n}§left(§sum Y_i - §hat{§beta}§sum X_i§right)'], d: [] },
+      { cap: '2 · 2. normal denklemde yerine yaz', f: ['§sum Y_iX_i = §dfrac{1}{n}§left(§sum Y_i - §hat{§beta}§sum X_i§right)§sum X_i + §hat{§beta}§sum X_i^2'], d: [] },
+      { cap: '3 · n ile çarp, parantezi aç', f: ['n§sum Y_iX_i = §sum Y_i§sum X_i - §hat{§beta}§left(§sum X_i§right)^2 + n§hat{§beta}§sum X_i^2'], d: [] },
+      { cap: '4 · $§hat{§beta}$\'lı terimleri topla', f: ['n§sum Y_iX_i - §sum Y_i§sum X_i = §hat{§beta}§left(n§sum X_i^2 - §left(§sum X_i§right)^2§right)'], d: [] },
+      { cap: '5 · $§hat{§beta}$', f: ['§hat{§beta} = §dfrac{n§sum Y_iX_i - §sum Y_i§sum X_i}{n§sum X_i^2 - §left(§sum X_i§right)^2}'], d: [] }
+    ]);
+  };
+
+  /* 11 · $§hat{§alpha}$ çözümü */
+  A.alfaCozum = function (el) {
+    B(el, S2, 'EKK: $§hat{§alpha}$ nasıl bulunur?');
+    Y.adimli(el, [
+      { cap: '1 · 1. normal denklemden $§hat{§beta}$\'yı yalnız bırak', f: ['§hat{§beta} = §dfrac{1}{§sum X_i}§left(§sum Y_i - n§hat{§alpha}§right)'], d: [] },
+      { cap: '2 · 2. normal denklemde yerine yaz', f: ['§sum Y_iX_i = §hat{§alpha}§sum X_i + §dfrac{1}{§sum X_i}§left(§sum Y_i - n§hat{§alpha}§right)§sum X_i^2'], d: [] },
+      { cap: '3 · ∑X ile çarp', f: ['§sum Y_iX_i§sum X_i = §hat{§alpha}§left(§sum X_i§right)^2 + §left(§sum Y_i - n§hat{§alpha}§right)§sum X_i^2'], d: [] },
+      { cap: '4 · $§hat{§alpha}$\'lı terimleri topla', f: ['§sum Y_iX_i§sum X_i - §sum Y_i§sum X_i^2 = §hat{§alpha}§left(§left(§sum X_i§right)^2 - n§sum X_i^2§right)'], d: [] },
+      { cap: '5 · $§hat{§alpha}$', f: ['§hat{§alpha} = §dfrac{§sum Y_iX_i§sum X_i - §sum Y_i§sum X_i^2}{§left(§sum X_i§right)^2 - n§sum X_i^2}'], d: [] }
+    ]);
+  };
+
+  /* 12 · Örnek 1: veri */
+  A.etVeri = function (el) {
+    B(el, S3, 'Örnek 1: reklam ve satış', 'Bir mobilya zincirinin 8 şubesinde aylık <b>reklam harcaması</b> (X, bin TL) ve <b>satış tutarı</b> (Y, bin TL). Reklamdaki 1 bin TL\'lik artış satışları ortalama ne kadar artırır? <span class="sunum-ipucu">(Veriler farazidir.)</span>');
+    var G = Y.grafik({ W: 480, H: 330, x: [0, 10, 2], y: [0, 30, 5], xe: 'Reklam X (bin TL)', ye: 'Satış Y (bin TL)', cls: 'graf-genis', etiket: 'Reklam harcaması ve satış' });
+    var nok = ETX.map(function (x, i) { var c = s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: G.sy(ETY[i]), r: 6 }); G.kat.appendChild(c); return c; });
+    var T = Y.tablo([
+      { b: 'Şube', lv: 0, f: function (i) { return i + 1; } },
+      { b: M('Y_i') + ' Satış (bin TL)', lv: 0, f: function (i) { return ETY[i]; }, t: ET.sY },
+      { b: M('X_i') + ' Reklam (bin TL)', lv: 0, f: function (i) { return ETX[i]; }, t: ET.sX }
+    ], ET.n, { topAd: 'n = ' + ET.n, hover: function (i, a) { nok[i].setAttribute('r', a ? 10 : 6); nok[i].style.fill = a ? 'var(--warm)' : ''; } });
+    el.appendChild(h('div', { class: 'iki dar-sol', 'data-kaydirma-yok': '' }, h('div', { class: 'kart', style: 'padding:8px' }, T.el), h('div', { class: 'kart' }, G.svg)));
+  };
+  /* 13 · Örnek 1: hesap tablosu */
+  A.etHesap = function (el) {
+    B(el, S3, 'Örnek 1: hesap tablosu');
+    var adim = 0, cap = h('span', { class: 'rozet sicak' });
+    var ad = ['Veriler ve toplamlar', 'Çarpımlar ve kareler'];
+    var T = Y.tablo([
+      { b: 'Şube', lv: 0, f: function (i) { return i + 1; } },
+      { b: M('Y_i'), lv: 0, f: function (i) { return ETY[i]; }, t: ET.sY, ort: M('§bar{Y} = ' + Y.k(ET.my)), ortLv: 0 },
+      { b: M('X_i'), lv: 0, f: function (i) { return ETX[i]; }, t: ET.sX, ort: M('§bar{X} = ' + Y.k(ET.mx)), ortLv: 0 },
+      { b: M('Y_iX_i'), lv: 1, f: function (i) { return ETY[i] * ETX[i]; }, t: ET.sXY },
+      { b: M('X_i^2'), lv: 1, f: function (i) { return ETX[i] * ETX[i]; }, t: ET.sXX }
+    ], ET.n, { topAd: '∑' });
+    var geriB = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { adim = Math.max(0, adim - 1); yenile(); } }, '← Önceki');
+    var ileriB = h('button', { class: 'btn birincil kucuk', type: 'button', onclick: function () { adim = Math.min(1, adim + 1); yenile(); } }, 'Sonraki sütunlar →');
+    function yenile() { T.ciz(adim); cap.textContent = (adim + 1) + ' / 2 · ' + ad[adim]; geriB.disabled = adim === 0; ileriB.disabled = adim === 1; }
+    el.appendChild(h('div', { class: 'arac-satir' }, geriB, ileriB, cap, h('span', { class: 'sunum-ipucu', html: 'n = ' + ET.n })));
+    el.appendChild(h('div', { class: 'kart', style: 'padding:8px;overflow-x:auto', 'data-kaydirma-yok': '' }, T.el));
+    yenile();
+  };
+  /* 14 · Örnek 1: β̂ ve α̂ */
+  A.etCozum = function (el) {
+    B(el, S3, 'Örnek 1: $§hat{§beta}$ ve $§hat{§alpha}$');
+    var e = ET, n = e.n, K = Y.k;
+    var bn = n * e.sXY - e.sY * e.sX, bd = n * e.sXX - e.sX * e.sX, an = e.sXY * e.sX - e.sY * e.sXX, ad = e.sX * e.sX - n * e.sXX;
+    Y.adimli(el, [
+      { cap: '1 · $§hat{§beta}$', f: ['§hat{§beta} = §dfrac{n§sum Y_iX_i - §sum Y_i§sum X_i}{n§sum X_i^2 - §left(§sum X_i§right)^2} = §dfrac{' + n + '§times ' + K(e.sXY) + ' - ' + K(e.sY) + '§times ' + K(e.sX) + '}{' + n + '§times ' + K(e.sXX) + ' - ' + K(e.sX) + '^2}', '= §dfrac{' + K(n * e.sXY) + ' - ' + K(e.sY * e.sX) + '}{' + K(n * e.sXX) + ' - ' + K(e.sX * e.sX) + '} = §dfrac{' + K(bn) + '}{' + K(bd) + '}'], d: [M('= ' + K(e.b))] },
+      { cap: '2 · $§hat{§alpha}$', f: ['§hat{§alpha} = §dfrac{§sum Y_iX_i§sum X_i - §sum Y_i§sum X_i^2}{§left(§sum X_i§right)^2 - n§sum X_i^2} = §dfrac{' + K(e.sXY) + '§times ' + K(e.sX) + ' - ' + K(e.sY) + '§times ' + K(e.sXX) + '}{' + K(e.sX) + '^2 - ' + n + '§times ' + K(e.sXX) + '}', '= §dfrac{' + K(an) + '}{' + K(ad) + '}'], d: [M('= ' + K(e.a))] },
+      { cap: '3 · Tahmin edilen model', f: ['§hat{Y}_i = ' + K(e.a) + ' + ' + K(e.b) + 'X_i'], d: [], tag: 'Reklam yapılmasa bile şube ortalama ' + Y.kt(e.a) + ' bin TL satar; reklam 1 bin TL artınca satış ortalama ' + Y.kt(e.b) + ' bin TL artar.' }
+    ]);
+  };
+  /* 15 · Örnek 1: hata terimi */
+  A.etHata = function (el) {
+    B(el, S3, 'Hata teriminin önemi', 'Her şubede gerçek satış ile modelin tahmini arasındaki fark: ' + M('§hat{§varepsilon}_i = Y_i - §hat{Y}_i'));
+    var adim = 0;
+    var G = Y.grafik({ W: 480, H: 330, x: [0, 10, 2], y: [0, 30, 5], xe: 'Reklam X (bin TL)', ye: 'Satış Y (bin TL)', cls: 'graf-genis', etiket: 'Regresyon doğrusu ve hatalar' });
+    var seg = [], nok = [];
+    G.kat.appendChild(s('line', { x1: G.sx(0), y1: G.sy(ET.a), x2: G.sx(10), y2: G.sy(ET.a + ET.b * 10), stroke: 'var(--warm)', 'stroke-width': 3 }));
+    ETX.forEach(function (x, i) {
+      var p = s('path', { d: Y.parantez(G.sx(x) + 6, G.sy(ETY[i]), G.sy(ET.fit[i]), 5), fill: 'none', stroke: 'var(--bad)', 'stroke-width': 2, opacity: 0 }); G.kat.appendChild(p); seg.push(p);
+      var c = s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: G.sy(ETY[i]), r: 5.5 }); G.kat.appendChild(c); nok.push(c);
+    });
+    var T = Y.tablo([
+      { b: 'Şube', lv: 0, f: function (i) { return i + 1; } },
+      { b: M('X_i'), lv: 0, f: function (i) { return ETX[i]; } },
+      { b: M('Y_i'), lv: 0, f: function (i) { return ETY[i]; }, t: ET.sY },
+      { b: M('§hat{§alpha} + §hat{§beta}X_i'), lv: 1, f: function (i) { return Y.kt(ET.a) + ' + ' + Y.kt(ET.b) + ' × ' + ETX[i]; } },
+      { b: M('§hat{Y}_i'), lv: 1, f: function (i) { return ET.fit[i]; }, t: ET.fit.reduce(function (p, c) { return p + c; }, 0) },
+      { b: M('§hat{§varepsilon}_i'), lv: 2, f: function (i) { return ET.e[i]; }, t: 0 },
+      { b: M('§hat{§varepsilon}_i^2'), lv: 3, f: function (i) { return ET.e[i] * ET.e[i]; }, t: ET.sse }
+    ], ET.n, { topAd: '∑', hover: function (i, a) { nok[i].setAttribute('r', a ? 9 : 5.5); seg[i].setAttribute('stroke-width', a ? 4 : 2); } });
+    var geriB = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { adim = Math.max(0, adim - 1); yenile(); } }, '← Önceki');
+    var ileriB = h('button', { class: 'btn birincil kucuk', type: 'button', onclick: function () { adim = Math.min(3, adim + 1); yenile(); } }, 'Sonraki sütun →');
+    var not = h('div', { class: 'okuma' });
+    function yenile() {
+      T.ciz(adim); geriB.disabled = adim === 0; ileriB.disabled = adim === 3;
+      seg.forEach(function (l) { l.setAttribute('opacity', adim >= 2 ? 0.9 : 0); });
+      not.textContent = '';
+      if (adim >= 1) not.appendChild(h('div', { class: 'kutu' }, h('i', {}, 'Model'), h('b', { html: M('§hat{Y}_i = ' + Y.k(ET.a) + ' + ' + Y.k(ET.b) + 'X_i') })));
+      if (adim >= 2) not.appendChild(h('div', { class: 'kutu vurgulu' }, h('i', {}, 'Hataların toplamı'), h('b', { html: M('§sum §hat{§varepsilon}_i = 0') })));
+      if (adim >= 3) not.appendChild(h('div', { class: 'kutu sicak' }, h('i', {}, 'Hata kareleri toplamı (SSE)'), h('b', { html: M('§sum §hat{§varepsilon}_i^2 = ' + Y.k(ET.sse)) })));
+    }
+    el.appendChild(h('div', { class: 'iki dar-sol', 'data-kaydirma-yok': '' },
+      h('div', { style: 'display:flex;flex-direction:column;gap:10px' }, h('div', { class: 'arac-satir' }, geriB, ileriB), h('div', { class: 'kart', style: 'padding:8px' }, T.el), not),
+      h('div', { class: 'kart' }, G.svg)));
+    yenile();
+  };
+})();
+
+/* ===== 03b-regresyon-a.js ===== */
+/* Sekme 4 (2/2) — Basit Doğrusal Regresyon (A): karşılaştırma, özellikler, matris yöntemi, uyum iyiliği, sınav + kayıt */
+(function () {
+  var h = E.h, s = E.s, tr = E.tr, Y = E.y, M = E.m, N = Y.n, B = Y.baslik, A = Y.A;
+  var S = A.S, ET = Y.et, ETX = Y.etX, ETY = Y.etY;
+
+  /* 16 · Korelasyon ve regresyon */
+  A.korReg = function (el) {
+    B(el, S[3], 'Korelasyon ve regresyon: farklar');
+    var R = [
+      ['Ne yapar?', 'Değişkenler arasındaki bağlantıyı (ortak ilişkiyi) belirler', 'X\'in Y ile sayısal olarak nasıl ilişkilendiğini açıklar'],
+      ['Bağımlı / bağımsız ayrımı', 'Yok', 'Var'],
+      ['Amaç', 'İlişkiyi ifade eden nicel bir değer bulmak', 'X\'e dayanarak Y\'nin değerlerini hesaplamak'],
+      ['Ölçtüğü', 'İki değişkenin birlikte hareket derecesi', 'X\'teki bir birimlik değişimin Y üzerindeki etkisi'],
+      ['Kullanımı', 'İki değişken arasında bağlantı kurmaya yardım eder', 'Bir değişkenin değerini başka bir değere dayanarak tahmin etmeye yardım eder'],
+      ['Nedensellik', 'Kurulmaz', 'X\'ten Y\'ye doğru nedensellik dolaylı olarak varsayılır'],
+      ['Değer aralığı', '−1 ile +1 arasında', 'Parametreler için sınır yok']
+    ];
+    var tablo = h('table', { class: 'tablo' }, h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { style: 'color:var(--accent)' }, 'Korelasyon'), h('th', { style: 'color:var(--warm)' }, 'Regresyon'))),
+      h('tbody', {}, R.map(function (r) { return h('tr', {}, h('td', { style: 'font-weight:700;white-space:nowrap' }, r[0]), h('td', {}, r[1]), h('td', {}, r[2])); })));
+    el.appendChild(h('div', { class: 'kart', style: 'padding:8px 14px' }, tablo));
+  };
+  /* küçük yardımcı: sayı aralığı için güzel eksen */
+  function guzel(lo, hi) {
+    var r = (hi - lo) / 5, p = Math.pow(10, Math.floor(Math.log(r) / Math.LN10)), st = [1, 2, 5, 10].map(function (k) { return k * p; }).filter(function (k) { return k >= r; })[0];
+    return [Math.floor(lo / st) * st, Math.ceil(hi / st) * st, st];
+  }
+
+  /* 17 · EKK tahmincilerinin özellikleri */
+  A.ekkOzellik = function (el) {
+    B(el, S[3], 'EKK tahmincilerinin özellikleri');
+    var mod = 0, X = ETX, Yv = ETY, kap = h('div', { class: 'kart' }), kartlar = h('div', { style: 'display:flex;flex-direction:column;gap:10px' });
+    function veri() {
+      if (mod === 0) { X = ETX; Yv = ETY; return; }
+      var n = 12; X = []; Yv = [];
+      for (var i = 0; i < n; i++) { var x = 10 + Math.random() * 90; X.push(Math.round(x)); Yv.push(Math.round(20 + 0.6 * x + (Math.random() - 0.5) * 40)); }
+    }
+    function ciz() {
+      var o = Y.ols(X, Yv), ax = guzel(Math.min.apply(null, X) - 5, Math.max.apply(null, X) + 5), ay = guzel(Math.min.apply(null, Yv) - 5, Math.max.apply(null, Yv) + 5);
+      var G = Y.grafik({ W: 460, H: 310, x: ax, y: ay, xe: 'X', ye: 'Y', cls: 'graf-genis', etiket: 'Regresyon doğrusu ve ortalama noktası' });
+      G.kat.appendChild(s('line', { x1: G.sx(ax[0]), y1: G.sy(o.a + o.b * ax[0]), x2: G.sx(ax[1]), y2: G.sy(o.a + o.b * ax[1]), stroke: 'var(--warm)', 'stroke-width': 3 }));
+      X.forEach(function (x, i) { G.kat.appendChild(s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: G.sy(Yv[i]), r: 5.5 })); });
+      G.kat.appendChild(s('circle', { cx: G.sx(o.mx), cy: G.sy(o.my), r: 8, fill: 'var(--panel)', stroke: 'var(--ink)', 'stroke-width': 3 }));
+      kap.textContent = ''; kap.appendChild(G.svg);
+      var sf = o.fit.reduce(function (p, c) { return p + c; }, 0) / o.n;
+      var kart = function (no, bas, f, ok) { return h('div', { class: 'olcu-kart ' + (ok ? 'sabit' : 'degisti'), style: 'padding:10px 14px;flex:none' }, h('div', { class: 'et', style: 'font-weight:700' }, no + ' ' + bas), h('div', { class: 'fm', style: 'font-size:1.1rem', html: M(f) }), h('div', { class: 'et' }, ok ? 'sağlanıyor ✓' : 'sağlanmıyor ✗')); };
+      kartlar.textContent = '';
+      kartlar.appendChild(kart('i.', 'Doğru (X̄, Ȳ) noktasından geçer', '§hat{Y}(§bar{X}) = ' + N(o.a + o.b * o.mx, 2) + ' = §bar{Y} = ' + N(o.my, 2), Math.abs(o.a + o.b * o.mx - o.my) < 1e-9));
+      kartlar.appendChild(kart('ii.', 'Nokta tahminciler (tek sayı)', '§hat{§alpha} = ' + N(o.a, 2) + ',\\; §hat{§beta} = ' + N(o.b, 3), true));
+      kartlar.appendChild(kart('iii.', 'Tahmin edilen Y\'nin ortalaması = gerçek Y\'nin ortalaması', '§bar{§hat{Y}} = ' + N(sf, 2) + ' = §bar{Y} = ' + N(o.my, 2), Math.abs(sf - o.my) < 1e-9));
+      kartlar.appendChild(kart('+', 'Hataların toplamı sıfırdır', '§sum §hat{§varepsilon}_i = ' + N(Math.abs(o.sumE) < 1e-9 ? 0 : o.sumE, 2), Math.abs(o.sumE) < 1e-9));
+    }
+    var anah = Y.anahtar(['Örnek 1 verisi', 'Rastgele veri'], 0, function (k) { mod = k; veri(); ciz(); });
+    var yeni = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { mod = 1; anah.sec(1); } }, 'Yeni rastgele veri çek');
+    el.appendChild(h('div', { class: 'arac-satir' }, anah, yeni));
+    el.appendChild(h('div', { class: 'iki dar-sag', 'data-kaydirma-yok': '' }, kap, kartlar));
+    veri(); ciz();
+  };
+
+  /* 18 · Matris yöntemi */
+  A.matris = function (el) {
+    B(el, S[4], 'EKK tahmincileri matris cebiri ile');
+    Y.adimli(el, [
+      { cap: '1 · Model', f: ['Y_i = §hat{§beta}_0 + §hat{§beta}_1X_i + §hat{§varepsilon}_i', '§mathbf{Y} = §mathbf{X}§hat{§boldsymbol{§beta}} + §hat{§boldsymbol{§varepsilon}}'], d: [], tag: 'n gözlem için alt alta yazılmış denklemler' },
+      { cap: '2 · Matrisler', f: ['Y = §begin{bmatrix}Y_1§§Y_2§§§vdots§§Y_n§end{bmatrix}_{n§times 1}, §quad X = §begin{bmatrix}1&X_1§§1&X_2§§§vdots&§vdots§§1&X_n§end{bmatrix}_{n§times 2}', '§hat{§beta} = §begin{bmatrix}§hat{§beta}_0§§§hat{§beta}_1§end{bmatrix}_{2§times 1}, §quad §hat{§varepsilon} = §begin{bmatrix}§hat{§varepsilon}_1§§§hat{§varepsilon}_2§§§vdots§§§hat{§varepsilon}_n§end{bmatrix}_{n§times 1}'], d: [] },
+      { cap: '3 · Normal denklemler matrisi', f: ['X^{§prime}Y = §left(X^{§prime}X§right)§hat{§beta}', '§hat{§beta} = §left(X^{§prime}X§right)^{-1}X^{§prime}Y'], d: [], tag: 'EKK tahmincisi' }
+    ]);
+  };
+
+  /* 19 · Örnek 2: hisse senedi ve politika faizi (matris yöntemi) */
+  A.ornek2 = function (el) {
+    B(el, S[4], 'Örnek 2: hisse senedi fiyatı ve politika faizi', 'Enerji şirketinin CEO\'su, hisse fiyatı (hs) ile politika faizi (f) arasındaki ilişkiyi matris yöntemiyle tahmin etmek istiyor.');
+    var hs = [7, 9.5, 11.5, 9.5, 10.5], f = [4, 5, 7, 5, 5], ay = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs'];
+    var o = Y.ols(f, hs), n = 5;
+    var T = h('table', { class: 'veri-tablo' }, h('thead', {}, h('tr', {}, h('th', { style: 'font-style:normal' }, 'Ay'), h('th', { html: M('hs_t') }), h('th', { html: M('f_t') }))),
+      h('tbody', {}, ay.map(function (a, i) { return h('tr', {}, h('td', {}, a), h('td', {}, Y.kt(hs[i], 1)), h('td', {}, String(f[i]))); })));
+    var det = n * o.sXX - o.sX * o.sX;
+    el.appendChild(h('div', { class: 'kart', style: 'padding:8px;align-self:flex-start;min-width:300px' }, T));
+    Y.adimli(el, [
+      { cap: '1 · X\'X ve X\'Y', f: ['X^{§prime}X = §begin{bmatrix}n&§sum f_t§§§sum f_t&§sum f_t^2§end{bmatrix} = §begin{bmatrix}5&' + o.sX + '§§' + o.sX + '&' + o.sXX + '§end{bmatrix}', 'X^{§prime}Y = §begin{bmatrix}§sum hs_t§§§sum hs_tf_t§end{bmatrix} = §begin{bmatrix}' + o.sY + '§§' + o.sXY + '§end{bmatrix}'], d: [] },
+      { cap: '2 · Determinant', f: ['§det §left|X^{§prime}X§right| = 5§times ' + o.sXX + ' - ' + o.sX + '§times ' + o.sX + ' = ' + det], d: [], tag: 'Determinant sıfırdan farklı: ters matris vardır' },
+      { cap: '3 · Ters matris', f: ['§left(X^{§prime}X§right)^{-1} = §dfrac{1}{' + det + '}§begin{bmatrix}' + o.sXX + '&-' + o.sX + '§§-' + o.sX + '&5§end{bmatrix}'], d: [] },
+      { cap: '4 · $§hat{§beta}$', f: ['§hat{§beta} = §dfrac{1}{' + det + '}§begin{bmatrix}' + o.sXX + '&-' + o.sX + '§§-' + o.sX + '&5§end{bmatrix}§begin{bmatrix}' + o.sY + '§§' + o.sXY + '§end{bmatrix} = §dfrac{1}{' + det + '}§begin{bmatrix}' + Math.round(o.sXX * o.sY - o.sX * o.sXY) + '§§' + Math.round(-o.sX * o.sY + 5 * o.sXY) + '§end{bmatrix}'], d: [M('= §begin{bmatrix}' + N(o.a, 2) + '§§' + N(o.b, 2) + '§end{bmatrix}')], tag: 'Model: $§hat{hs}_t = ' + N(o.a, 2) + ' + ' + N(o.b, 2) + 'f_t$' }
+    ]);
+  };
+  /* 20 · Serbestlik derecesi */
+  A.serbestlik = function (el) {
+    B(el, S[5], 'Serbestlik derecesi', 'Gözlem sayısı ile tahmin edilen parametre sayısı arasındaki fark: ' + M('n - k'));
+    var gun = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'], secilen = [];
+    var ayakkabi = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }), seri = h('div', { style: 'display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px' }), mesaj = h('div', { class: 'not mavi' });
+    function ciz() {
+      ayakkabi.textContent = ''; seri.textContent = '';
+      for (var k = 1; k <= 7; k++) (function (k) {
+        var kullanildi = secilen.indexOf(k) >= 0;
+        ayakkabi.appendChild(h('button', { type: 'button', class: 'btn', disabled: kullanildi || secilen.length >= 7, style: 'min-width:92px', onclick: function () { secilen.push(k); var kalan = [1, 2, 3, 4, 5, 6, 7].filter(function (x) { return secilen.indexOf(x) < 0; }); if (kalan.length === 1) secilen.push(kalan[0]); ciz(); } }, 'Ayakkabı ' + k));
+      })(k);
+      gun.forEach(function (g, i) {
+        var secili = i < secilen.length, zorunlu = i === 6 && secili;
+        seri.appendChild(h('div', { class: 'kart', style: 'padding:8px;text-align:center;' + (zorunlu ? 'border-color:var(--warm)' : secili ? 'border-color:var(--accent)' : 'opacity:.6') },
+          h('div', { class: 'etiket' }, g), h('div', { style: 'font-weight:800;font-size:1.2rem;min-height:1.6em' }, secili ? String(secilen[i]) : '·'),
+          h('div', { class: 'fm', style: 'font-size:1rem', html: M('§dfrac{1}{' + (7 - i) + '}') }), zorunlu ? h('div', { class: 'rozet sicak', style: 'margin-top:4px' }, 'zorunlu') : null));
+      });
+      mesaj.innerHTML = secilen.length < 7 ? '<b>' + (secilen.length + 1) + '. gün</b> için kalan ' + (7 - secilen.length) + ' ayakkabıdan birini seçin: olasılık ' + M('§dfrac{1}{' + (7 - secilen.length) + '}')
+        : '<b>Son gün seçim yok:</b> kalan ayakkabıyı giymek zorunlu. 7 gözlemden yalnızca <b>6</b>\'sı serbest: ' + M('n - k = 7 - 1 = 6');
+    }
+    var sifir = h('button', { class: 'btn kucuk', type: 'button', onclick: function () { secilen = []; ciz(); } }, 'Baştan başla');
+    el.appendChild(h('p', { class: 'metin', style: 'font-size:1.02rem', html: 'Haftanın 7 günü için 7 ayakkabımız var; her gün kalanlardan birini rastgele giyiyoruz.' }));
+    el.appendChild(ayakkabi); el.appendChild(seri); el.appendChild(mesaj);
+    el.appendChild(h('div', { class: 'arac-satir' }, sifir, h('span', { class: 'rozet sicak' }, 'Hiçbir analizde parametre sayısı gözlem sayısından fazla olmamalı')));
+    ciz();
+  };
+
+  /* 21 · Tahminin Standart Hatası */
+  A.tsh = function (el) {
+    B(el, S[5], 'Uyum İyiliği 1: Tahminin Standart Hatası');
+    var e = ET, k = 2, K = Y.k, df = e.n - k;
+    var pay = e.sYY - e.a * e.sY - e.b * e.sXY;
+    Y.adimli(el, [
+      { cap: '1 · Hataların Standart Sapması', f: ['s = §sqrt{§dfrac{§sum §left(Y_i - §hat{Y}_i§right)^2}{n}} = §sqrt{§dfrac{§sum §varepsilon_i^2}{n}}'], d: [], tag: 'Büyük örneklem (n ≥ 30)' },
+      { cap: '2 · n < 30 ise Serbestlik Derecesi düzeltmesi', f: ['s = §sqrt{§dfrac{§sum §left(Y_i - §hat{Y}_i§right)^2}{n-k}} = §sqrt{§dfrac{§sum §varepsilon_i^2}{n-k}}'], d: [], tag: 'k: parametre sayısı' },
+      { cap: '3 · Örnek 1: reklam ve satış', f: [
+          's = §sqrt{§dfrac{§sum §hat{§varepsilon}_i^2}{n-k}} = §sqrt{§dfrac{' + K(e.sse) + '}{' + e.n + '-2}} = §sqrt{' + K(e.s2) + '} = ' + K(e.s, 2),
+          's = §sqrt{§dfrac{§sum Y_i^2 - §hat{§beta}_0§sum Y_i - §hat{§beta}_1§sum X_iY_i}{n-k}} = §sqrt{§dfrac{' + K(e.sYY) + ' - ' + K(e.a) + '§times ' + K(e.sY) + ' - ' + K(e.b) + '§times ' + K(e.sXY) + '}{' + df + '}}',
+          '§phantom{s} = §sqrt{§dfrac{' + K(pay) + '}{' + df + '}} = ' + K(Math.sqrt(pay / df), 2)],
+        d: [], tag: 'İki formül aynı sonucu verir', uyari: 'Satış tahminleri gerçek satışlardan ortalama <b>' + Y.kt(e.s, 2) + ' bin TL</b> sapar.' }
+    ]);
+  };
+  /* 22 · Belirlilik katsayısı */
+  A.r2 = function (el) {
+    B(el, S[5], 'Uyum İyiliği 2: Belirlilik Katsayısı R²');
+    var e = ET, K = Y.k, bar = h('div', { style: 'display:flex;height:60px;border-radius:14px;overflow:hidden;border:1px solid var(--line)' },
+      h('div', { style: 'flex:' + e.ess + ' 1 0;background:var(--accent);color:var(--accent-ink);display:flex;flex-direction:column;justify-content:center;padding:0 14px' }, h('b', {}, 'Açıklanan'), h('span', { style: 'font-size:.85rem' }, Y.kt(e.ess))),
+      h('div', { style: 'flex:' + e.sse + ' 1 0;background:var(--warm);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:0 8px;min-width:96px' }, h('b', { style: 'font-size:.8rem' }, 'Açıklanamayan'), h('span', { style: 'font-size:.85rem' }, Y.kt(e.sse))));
+    var T = Y.tablo([
+      { b: 'Şube', lv: 0, f: function (i) { return i + 1; } },
+      { b: M('Y_i'), lv: 0, f: function (i) { return ETY[i]; }, t: e.sY },
+      { b: M('§hat{Y}_i'), lv: 0, f: function (i) { return e.fit[i]; }, t: e.sY },
+      { b: M('Y_i - §bar{Y}'), lv: 0, f: function (i) { return ETY[i] - e.my; } },
+      { b: M('§left(Y_i - §bar{Y}§right)^2'), lv: 0, f: function (i) { return Math.pow(ETY[i] - e.my, 2); }, t: e.syy },
+      { b: M('§hat{Y}_i - §bar{Y}'), lv: 0, f: function (i) { return e.fit[i] - e.my; } },
+      { b: M('§left(§hat{Y}_i - §bar{Y}§right)^2'), lv: 0, f: function (i) { return Math.pow(e.fit[i] - e.my, 2); }, t: e.ess }
+    ], e.n, { topAd: '∑' });
+    el.appendChild(h('div', { class: 'kart' }, h('div', { class: 'fm', html: M('§underbrace{§sum §left(Y_i - §bar{Y}§right)^2}_{§text{Toplam}} = §underbrace{§sum §left(§hat{Y}_i - §bar{Y}§right)^2}_{§text{Açıklanan}} + §underbrace{§sum §hat{§varepsilon}_i^2}_{§text{Açıklanamayan}}') }),
+      h('div', { class: 'fm', style: 'margin-top:4px', html: M(K(e.syy) + ' = ' + K(e.ess) + ' + ' + K(e.sse)) }), h('div', { style: 'margin-top:8px' }, bar)));
+    el.appendChild(h('div', { class: 'iki dar-sag' },
+      h('div', { class: 'kart', style: 'padding:8px;overflow-x:auto' }, T.el),
+      h('div', { style: 'display:flex;flex-direction:column;gap:10px' },
+        h('div', { class: 'fm', style: 'font-size:clamp(1rem,1.6vw,1.3rem)', html: M('R^2 = §dfrac{§text{Açıklanan}}{§text{Toplam}} = §dfrac{' + K(e.ess) + '}{' + K(e.syy) + '} = ' + K(e.r2, 4)) }),
+        h('div', { class: 'not mavi', html: 'Satışlardaki değişimlerin yaklaşık <b>%' + tr(e.r2 * 100, 0) + '</b>\'i reklam harcamasındaki değişimlerle açıklanır; kalan <b>%' + tr((1 - e.r2) * 100, 0) + '</b> modele alınmayan etkenlerden (şube büyüklüğü, konum, mevsim…) gelir.' }),
+        h('div', { class: 'not', html: '<b>R²</b> 0 ile 1 arasındadır. Notlara göre %70\'in üzerindeki değerler kabul edilebilir.' }))));
+    T.ciz(99);
+  };
+  /* 23 · R² nasıl değişir? */
+  A.r2Oyun = function (el) {
+    B(el, S[5], 'R² ne zaman yüksek?', 'Dağılmayı artırın: noktalar doğrudan uzaklaştıkça açıklanan pay küçülür.');
+    var rg = E.rng(8), n = 30, X = [], Z = [], i;
+    for (i = 0; i < n; i++) { X.push(0.3 + 9.4 * rg()); Z.push(E.normal(rg)); }
+    var g = 6, G = Y.grafik({ W: 460, H: 320, x: [0, 10, 2], y: [-10, 50, 10], xe: 'X', ye: 'Y', cls: 'graf-genis', etiket: 'Dağılma ve R²' });
+    var bar = h('div', { style: 'display:flex;height:48px;border-radius:12px;overflow:hidden;border:1px solid var(--line)' }), oku = h('div', { class: 'okuma' });
+    var ks = Y.kaydir('Dağılma', 0, 20, 0.5, g, function (v) { g = v; ciz(); });
+    function ciz() {
+      var Yv = X.map(function (x, k) { return 5 + 3.5 * x + g * Z[k]; }), o = Y.ols(X, Yv);
+      Y.temizle(G.kat);
+      G.kat.appendChild(s('line', { x1: G.sx(0), y1: G.sy(o.a), x2: G.sx(10), y2: G.sy(o.a + 10 * o.b), stroke: 'var(--warm)', 'stroke-width': 3 }));
+      X.forEach(function (x, k) { G.kat.appendChild(s('circle', { class: 'dag-nokta', cx: G.sx(x), cy: G.sy(Math.max(-9.5, Math.min(49.5, Yv[k]))), r: 5 })); });
+      bar.textContent = '';
+      bar.appendChild(h('div', { style: 'flex:' + Math.max(o.r2, 0.0001) + ' 1 0;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;padding:0 10px;font-weight:700' }, o.r2 > 0.12 ? 'Açıklanan' : ''));
+      bar.appendChild(h('div', { style: 'flex:' + Math.max(1 - o.r2, 0.0001) + ' 1 0;background:var(--warm);color:#fff;display:flex;align-items:center;padding:0 10px;font-weight:700' }, o.r2 < 0.88 ? 'Açıklanamayan' : ''));
+      oku.textContent = '';
+      oku.appendChild(h('div', { class: 'kutu vurgulu' }, h('i', {}, 'Belirlilik katsayısı'), h('b', { html: M('R^2 = ' + N(o.r2, 3)) })));
+      oku.appendChild(h('div', { class: 'kutu' }, h('i', {}, 'Korelasyonun karesi'), h('b', { html: M('r^2 = ' + N(o.r * o.r, 3)) })));
+    }
+    el.appendChild(h('div', { class: 'iki dar-sag', 'data-kaydirma-yok': '' }, h('div', { class: 'kart' }, G.svg), h('div', { style: 'display:flex;flex-direction:column;gap:12px' }, ks, bar, oku,
+      h('p', { class: 'sunum-ipucu', style: 'margin:0' }, 'R² = 1: Y\'deki değişimin tamamı X ile açıklanır · R² = 0: hiçbiri açıklanamaz. Uygulamada uç değerler beklenmez.'))));
+    ciz();
+  };
+
+  /* 24 · Mini sınav */
+  A.sinav = function (el) {
+    B(el, 'Özet', 'Kendinizi sınayın', 'Basit doğrusal regresyon (A): 8 soru.');
+    E.test(el, [
+      { soru: 'Regresyon modelindeki hata terimi <b>ε</b> neyi temsil eder?', secenekler: ['X ile Y arasındaki ilişkinin açıklanamayan, olasılıksal kısmını', 'Eğim parametresini', 'Bağımsız değişkeni', 'Gözlem sayısını'], dogru: 0, aciklama: 'ε, modele alınmayan etkenlerin ve rassal değişimin toplamını temsil eder.' },
+      { soru: 'EKK\'de neden hataların toplamı değil, <b>karelerinin toplamı</b> en küçük yapılır?', secenekler: ['Çünkü ∑ε = 0\'dır; toplam bilgi vermez', 'Çünkü kare almak hesabı kolaylaştırır', 'Çünkü hatalar hep pozitiftir', 'Çünkü n büyüktür'], dogru: 0, aciklama: 'Artı ve eksi hatalar birbirini götürür; kareler bu sorunu çözer.' },
+      { soru: '1. normal denklem hangisidir?', secenekler: ['∑Y = n$§hat{§alpha}$ + $§hat{§beta}$∑X', '∑YX = $§hat{§alpha}$∑X + $§hat{§beta}$∑X²', 'Ȳ = $§hat{§beta}$X̄', '∑ε² = 0'], dogru: 0, aciklama: '$§hat{§alpha}$\'ya göre türev sıfıra eşitlenince 1. normal denklem bulunur.' },
+      { soru: 'EKK regresyon doğrusu hangi noktadan geçer?', secenekler: ['(X̄, Ȳ)', '(0, 0)', '(∑X, ∑Y)', '(n, k)'], dogru: 0, aciklama: 'Ȳ = $§hat{§alpha}$ + $§hat{§beta}$X̄ olduğundan doğru ortalamalar noktasından geçer.' },
+      { soru: 'Örnek 1\'deki gibi n = 8 gözlem ve k = 2 parametre için serbestlik derecesi kaçtır?', secenekler: ['6', '8', '10', '2'], dogru: 0, aciklama: 'Serbestlik derecesi n − k = 8 − 2 = 6.' },
+      { soru: '<b>R² = 0</b> ise ne söylenir?', secenekler: ['Y\'deki değişimin hiçbiri X ile açıklanamaz', 'Y\'deki değişimin tamamı açıklanır', 'Model mükemmeldir', '$§hat{§beta}$ = 1\'dir'], dogru: 0, aciklama: 'R² açıklanan değişimin toplam değişime oranıdır.' },
+      { soru: 'Hangisi yalnızca regresyonda vardır?', secenekler: ['Bağımlı–bağımsız değişken ayrımı', '−1 ile +1 arası değer sınırı', 'Ortak hareket derecesinin ölçülmesi', 'Hiçbiri'], dogru: 0, aciklama: 'Korelasyonda bu ayrım yoktur; regresyon X\'ten Y\'ye bir yön varsayar.' },
+      { soru: 'Örnek 1\'de $§hat{§beta} = 2$ neyi anlatır?', secenekler: ['Reklam 1 bin TL arttığında satış ortalama 2 bin TL artar', 'Satış 1 bin TL arttığında reklam 2 bin TL artar', 'Reklam yapılmazsa satış 2 bin TL olur', 'Reklam ile satış ilişkisizdir'], dogru: 0, aciklama: 'Eğim, X\'teki (reklam) bir birimlik değişimin Y (satış) üzerindeki ortalama etkisidir. Reklam yokken beklenen satış $§hat{§alpha} = 8$ bin TL\'dir.' }
+    ]);
+  };
+
+  E.sekme({
+    id: 'regresyon-a', ad: 'Basit Regresyon (A)', baslik: 'Ekonometri · Basit Doğrusal Regresyon (A)',
+    slaytlar: [
+      { ad: 'Basit Doğrusal Regresyon (A)', goster: A.kapak },
+      { ad: 'Matematiksel model ve regresyon modeli', bolum: S[0], goster: A.model },
+      { ad: 'Basit regresyon modeli', bolum: S[0], goster: A.basitModel },
+      { ad: 'Anakütle verisi', bolum: S[0], goster: A.anakutle },
+      { ad: 'Örneklem ve tahmin', bolum: S[0], goster: A.orneklem },
+      { ad: 'ARF ve ÖRF', bolum: S[0], goster: A.arfOrf },
+      { ad: 'Hata terimi neden ortaya çıkar?', bolum: S[0], goster: A.hataNedenleri },
+      { ad: 'EKK\'nin amacı', bolum: S[1], goster: A.ekkAmaci },
+      { ad: 'Normal denklemler', bolum: S[1], goster: A.normalDenk },
+      { ad: 'Eğim parametresinin çözümü', bolum: S[1], goster: A.betaCozum },
+      { ad: 'Sabit parametresinin çözümü', bolum: S[1], goster: A.alfaCozum },
+      { ad: 'Örnek 1: veri', bolum: S[2], goster: A.etVeri },
+      { ad: 'Örnek 1: hesap tablosu', bolum: S[2], goster: A.etHesap },
+      { ad: 'Örnek 1: eğim ve sabit', bolum: S[2], goster: A.etCozum },
+      { ad: 'Örnek 1: hata terimi', bolum: S[2], goster: A.etHata },
+      { ad: 'Korelasyon ve regresyon', bolum: S[3], goster: A.korReg },
+      { ad: 'EKK tahmincilerinin özellikleri', bolum: S[3], goster: A.ekkOzellik },
+      { ad: 'Matris cebiri ile EKK', bolum: S[4], goster: A.matris },
+      { ad: 'Örnek 2: matris yöntemi', bolum: S[4], goster: A.ornek2 },
+      { ad: 'Serbestlik derecesi', bolum: S[5], goster: A.serbestlik },
+      { ad: 'Tahminin Standart Hatası', bolum: S[5], goster: A.tsh },
+      { ad: 'Belirlilik Katsayısı R²', bolum: S[5], goster: A.r2 },
+      { ad: 'R² ne zaman yüksek?', bolum: S[5], goster: A.r2Oyun },
+      { ad: 'Özet ve mini sınav', goster: A.sinav }
     ]
   });
 })();
